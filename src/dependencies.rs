@@ -128,18 +128,25 @@ fn get_dependency(packages: &Vec<&toml::TomlTable>, lib_name: &String) -> AppRes
          .ok_or_else(|| app_err(format!("Couldn't find version string in package: '{}'!", package)))
    );
 
-   let dep_strs = try!(
-      package.get(deps_str)
-         .and_then(|ds| ds.as_slice())
-         .and_then(|slice| {
-            let ds = slice.iter()
-               .filter_map(|v| v.as_str())
-               .collect::<Vec<&str>>();
+   let dep_strs = match package.get(deps_str) {
+      None => {
+         Vec::<&str>::new()
+      },
 
-            if ! ds.is_empty() { Some(ds) } else { None }
-         })
-         .ok_or_else(|| app_err(format!("Couldn't get Array of Strings for 'dependencies' entry: '{}'!", package)))
-   );
+      Some(value) => {
+         try!(
+            value.as_slice()
+               .and_then(|slice| {
+                  let ds = slice.iter()
+                     .filter_map(|v| v.as_str())
+                     .collect::<Vec<&str>>();
+
+                  if ! ds.is_empty() { Some(ds) } else { None }
+               })
+               .ok_or_else(|| app_err(format!("Couldn't get Array of Strings for 'dependencies' entry: '{}'!", package)))
+         )
+      }
+   };
 
    let mut dep_names: Vec<&str> = Vec::new();
    for dep_str in dep_strs.iter() {
