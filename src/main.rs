@@ -46,7 +46,8 @@ fn main()
 
 fn update_tags() -> AppResult<()>
 {
-   let cargo_dir = try!(find_cargo_toml_dir(&Path::new("/home/dan/projekte/rusty-tags/src")));
+   let cwd = try!(os::getcwd());
+   let cargo_dir = try!(find_cargo_toml_dir(&cwd));
    let deps = try!(read_dependencies(&cargo_dir));
 
    let mut tag_files: Vec<Path> = Vec::new();
