@@ -1,5 +1,4 @@
 use std::fmt::{Show, Formatter, Error};
-use std::io::fs::PathExtensions;
 use std::io;
 use toml;
 
@@ -95,7 +94,7 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
             .ok_or_else(|| app_err(format!("Couldn't find name string in package: '{}'!", package)))
       );
 
-      let dep_names = try!(get_dependencies(*package, &lib_name));
+      let dep_names = try!(get_dependencies(*package));
       let mut dep_src_kinds: Vec<SourceKind> = Vec::new();
       for dep_name in dep_names.iter() {
          let dep_package = try!(find_package(&packages, dep_name));
@@ -171,7 +170,7 @@ fn get_source_kind(lib_package: &toml::TomlTable, lib_name: &String) -> AppResul
    }
 }
 
-fn get_dependencies(lib_package: &toml::TomlTable, lib_name: &String) -> AppResult<Vec<String>>
+fn get_dependencies(lib_package: &toml::TomlTable) -> AppResult<Vec<String>>
 {
    let deps_str = &String::from_str("dependencies");
    let dep_strs = match lib_package.get(deps_str) {

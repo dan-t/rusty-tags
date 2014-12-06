@@ -45,7 +45,7 @@ pub fn crates_io_src_dir() -> AppResult<Path>
       })
    );
 
-   let mut paths = glob_path(&src_dir);
+   let paths = glob_path(&src_dir);
    if paths.count() != 1 {
       return Err(app_err(format!("Expected one matching path for '{}'!", src_dir.display())));
    }

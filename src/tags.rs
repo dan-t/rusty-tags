@@ -1,5 +1,4 @@
 use std::io;
-use std::io::fs;
 use std::io::fs::PathExtensions;
 use std::io::process::Command;
 use std::fmt::{Show, Formatter, Error};
