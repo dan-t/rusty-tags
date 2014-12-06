@@ -117,10 +117,15 @@ pub fn update_crates_io_tags(lib_name: &String, version: &String) -> AppResult<T
 /// merges `tag_files` into `merged_tag_file`
 pub fn merge_tags(tag_files: &Vec<Path>, merged_tag_file: &Path) -> AppResult<()>
 {
+   println!("Merging ...\n   tags:");
+
    let mut file_contents: Vec<String> = Vec::new();
    for file in tag_files.iter() {
+      println!("      {}", file.display());
       file_contents.push(try!(io::File::open(file).read_to_string()));
    }
+
+   println!("\n   into:\n      {}\n", merged_tag_file.display());
 
    let mut merged_lines: Vec<&str> = Vec::with_capacity(100_000);
    for content in file_contents.iter() {
@@ -165,8 +170,10 @@ pub fn create_tags(src_dir: &Path, tags_file: &Path) -> AppResult<()>
       .arg(tags_file)
       .arg(src_dir);
 
-   try!(cmd.output());
+   println!("Creating tags ...\n   for source:\n      {}\n\n   cached at:\n      {}\n",
+            src_dir.display(), tags_file.display());
 
+   try!(cmd.output());
    Ok(())
 }
 
