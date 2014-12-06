@@ -59,6 +59,27 @@ pub fn update_git_tags(lib_name: &String, commit_hash: &String) -> AppResult<Tag
       }
    }
 
+   // the git repository name hasn't to match the name of the library,
+   // so here we're just going through all git directories and searching
+   // for the one with a matching commit hash
+   let mut src_dir = try!(git_src_dir());
+   src_dir.push("*");
+   src_dir.push("master");
+
+   let mut src_paths = glob_path(&src_dir);
+   for src_path in src_paths {
+      let src_commit_hash = try!(get_commit_hash(&src_path));
+      if *commit_hash == src_commit_hash {
+         let mut cached = true;
+         if ! tags_file.is_file() {
+            try!(create_tags(&src_path, &tags_file));
+            cached = false;
+         }
+
+         return Ok(Tags { src_dir: src_path.clone(), tags_file: tags_file, cached: cached });
+      }
+   }
+
    Err(app_err(format!("
    Couldn't find git repository of the dependency '{}'!
    Have you run 'cargo build' at least once after adding the dependency?", lib_name)))
