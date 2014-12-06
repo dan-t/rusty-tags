@@ -70,10 +70,15 @@ fn update_tags() -> AppResult<()>
          TagsRoot::Lib { ref src_kind, ref dependencies } => {
             let lib_tags = try!(update_tags_of(src_kind));
             if lib_tags.cached {
-               continue;
+               let mut src_tags = lib_tags.src_dir.clone();
+               src_tags.push("rusty.tags");
+               if src_tags.is_file() {
+                  continue;
+               }
             }
 
             tag_files.push(lib_tags.tags_file);
+
             for dep in dependencies.iter() {
                tag_files.push(try!(update_tags_of(dep)).tags_file);
             }
