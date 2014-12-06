@@ -2,6 +2,7 @@ use std::io;
 use std::io::fs;
 use std::io::fs::PathExtensions;
 use std::io::process::Command;
+use std::fmt::{Show, Formatter, Error};
 
 use app_result::{AppResult, app_err};
 
@@ -15,15 +16,19 @@ use dirs::{
 pub struct Tags
 {
    /// the root directory of the source code
-   /// from which the tags have been created
+   /// for which the tags have been created
    pub src_dir: Path,
 
    /// the tags file of the sources in `src_dir`
-   pub tags_file: Path
+   pub tags_file: Path,
+
+   /// indicates if the tags file is already existing
+   /// and the cached tags file is returned
+   pub cached: bool
 }
 
 /// Checks if there's already a tags file for `lib_name` and `commit_hash`
-/// and if not it's creating a new tags file and returning its path.
+/// and if not it's creating a new tags file and returning it.
 pub fn update_git_tags(lib_name: &String, commit_hash: &String) -> AppResult<Tags>
 {
    let mut lib_tags = lib_name.clone();
@@ -44,11 +49,13 @@ pub fn update_git_tags(lib_name: &String, commit_hash: &String) -> AppResult<Tag
    for src_path in src_paths {
       let src_commit_hash = try!(get_commit_hash(&src_path));
       if *commit_hash == src_commit_hash {
+         let mut cached = true;
          if ! tags_file.is_file() {
             try!(create_tags(&src_path, &tags_file));
+            cached = false;
          }
 
-         return Ok(Tags { src_dir: src_path.clone(), tags_file: tags_file });
+         return Ok(Tags { src_dir: src_path.clone(), tags_file: tags_file, cached: cached });
       }
    }
 
@@ -58,7 +65,7 @@ pub fn update_git_tags(lib_name: &String, commit_hash: &String) -> AppResult<Tag
 }
 
 /// Checks if there's already a tags file for `lib_name` and `version`
-/// and if not it's creating a new tags file and returning its path.
+/// and if not it's creating a new tags file and returning it.
 pub fn update_crates_io_tags(lib_name: &String, version: &String) -> AppResult<Tags>
 {
    let mut lib_tags = lib_name.clone();
@@ -77,11 +84,13 @@ pub fn update_crates_io_tags(lib_name: &String, version: &String) -> AppResult<T
    Have you run 'cargo build' at least once after adding the dependency?", lib_name)));
    }
 
+   let mut cached = true;
    if ! tags_file.is_file() {
       try!(create_tags(&src_dir, &tags_file));
+      cached = false;
    }
 
-   Ok(Tags { src_dir: src_dir, tags_file: tags_file })
+   Ok(Tags { src_dir: src_dir, tags_file: tags_file, cached: cached })
 }
 
 /// merges `tag_files` into `merged_tag_file`
@@ -152,4 +161,13 @@ fn get_commit_hash(git_dir: &Path) -> AppResult<String>
    String::from_utf8(out.output)
       .map(|s| s.as_slice().trim().to_string())
       .map_err(|_| app_err("Couldn't convert git output to utf8!".to_string()))
+}
+
+impl Show for Tags
+{
+   fn fmt(&self, f: &mut Formatter) -> Result<(), Error>
+   {
+      write!(f, "Tags ( src_dir: {}, tags_file: {}, cached: {} )",
+             self.src_dir.display(), self.tags_file.display(), self.cached)
+   }
 }

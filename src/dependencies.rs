@@ -1,32 +1,46 @@
+use std::fmt::{Show, Formatter, Error};
 use std::io::fs::PathExtensions;
 use std::io;
 use toml;
 
 use app_result::{AppResult, app_err};
 
-#[deriving(Show)]
-pub enum Dependency
+pub enum TagsRoot
 {
-   /// the depedency is based on a git repository
-   Git {
-      lib_name: String,
-      commit_hash: String,
-      dependencies: Vec<Dependency>
+   /// the source directory and the dependencies
+   /// of the cargo project
+   Src {
+      src_dir: Path,
+      dependencies: Vec<SourceKind>
    },
 
-   /// the depedency is from crates.io
-   CratesIo {
-      lib_name: String,
-      version: String,
-      dependencies: Vec<Dependency>
+   /// a library and its depedencies
+   Lib {
+      src_kind: SourceKind,
+      dependencies: Vec<SourceKind>
    }
 }
 
-pub type Dependencies = Vec<Dependency>;
+#[deriving(Show)]
+pub enum SourceKind
+{
+   /// the source is from a git repository
+   Git {
+      lib_name: String,
+      commit_hash: String
+   },
+
+   /// the source is from crates.io
+   CratesIo {
+      lib_name: String,
+      version: String
+   }
+}
+
+pub type TagsRoots = Vec<TagsRoot>;
 
 /// Reads the dependecies from the `Cargo.toml` located in `cargo_toml_dir`
-/// and for git depedencies the commit hash is read from the `Cargo.lock`. 
-pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<Dependencies>
+pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
 {
    let mut cargo_toml = cargo_toml_dir.clone();
    cargo_toml.push("Cargo.toml");
@@ -39,10 +53,10 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<Dependencies>
          .ok_or_else(|| app_err(format!("Couldn't parse '{}': {}", cargo_toml.display(), toml_parser.errors)))
    );
 
-   let mut deps: Dependencies = Vec::new();
+   let mut tags_roots: TagsRoots = Vec::new();
    let deps_string = "dependencies".to_string();
    if ! toml_table.contains_key(&deps_string) {
-      return Ok(deps);
+      return Ok(tags_roots);
    }
 
    let deps_table = try!(
@@ -75,14 +89,30 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<Dependencies>
          .ok_or(app_err(format!("Couldn't get Array of Tables entry for 'package'!")))
    );
 
-   let name_str = &String::from_str("name");
-   let version_str = &String::from_str("version");
-   let source_str = &String::from_str("source");
+   for package in packages.iter() {
+      let lib_name = try!(
+         package.get(&"name".to_string())
+            .and_then(|n| n.as_str().map(|n| n.to_string()))
+            .ok_or_else(|| app_err(format!("Couldn't find name string in package: '{}'!", package)))
+      );
 
+      let dep_names = try!(get_dependencies(*package, &lib_name));
+      let mut dep_src_kinds: Vec<SourceKind> = Vec::new();
+      for dep_name in dep_names.iter() {
+         let dep_package = try!(find_package(&packages, dep_name));
+         dep_src_kinds.push(try!(get_source_kind(dep_package, dep_name)));
+      }
+
+      let src_kind = try!(get_source_kind(*package, &lib_name));
+      tags_roots.push(TagsRoot::Lib { src_kind: src_kind, dependencies: dep_src_kinds });
+   }
+
+   let mut lib_src_kinds: Vec<SourceKind> = Vec::new();
    for (lib_name, value) in deps_table.iter() {
       match *value {
          toml::String(_) | toml::Table(_) => {
-            deps.push(try!(get_dependency(&packages, lib_name)));
+            let lib_package = try!(find_package(&packages, lib_name));
+            lib_src_kinds.push(try!(get_source_kind(lib_package, lib_name)));
          }
 
          _ => {
@@ -93,27 +123,20 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<Dependencies>
       }
    }
 
-   Ok(deps)
+   tags_roots.push(TagsRoot::Src { src_dir: cargo_toml_dir.clone(), dependencies: lib_src_kinds });
+
+   Ok(tags_roots)
 }
 
-fn get_dependency(packages: &Vec<&toml::TomlTable>, lib_name: &String) -> AppResult<Dependency>
+fn get_source_kind(lib_package: &toml::TomlTable, lib_name: &String) -> AppResult<SourceKind>
 {
-   let name_str = &String::from_str("name");
-
-   let package = try!(
-      packages.iter()
-         .find(|t| t.get(name_str).and_then(|n| n.as_str()) == Some(lib_name[]))
-         .ok_or_else(|| app_err(format!("Couldn't find package with name = '{}'!", lib_name)))
-   );
-
    let version_str = &String::from_str("version");
    let source_str = &String::from_str("source");
-   let deps_str = &String::from_str("dependencies");
 
    let source = try!(
-      package.get(source_str)
+      lib_package.get(source_str)
          .and_then(|src| src.as_str())
-         .ok_or_else(|| app_err(format!("Couldn't find source string in package: '{}'!", package)))
+         .ok_or_else(|| app_err(format!("Couldn't find source string in package: '{}'!", lib_package)))
    );
 
    let src_type = try!(
@@ -123,12 +146,36 @@ fn get_dependency(packages: &Vec<&toml::TomlTable>, lib_name: &String) -> AppRes
    );
 
    let version = try!(
-      package.get(version_str)
+      lib_package.get(version_str)
          .and_then(|vers| vers.as_str())
-         .ok_or_else(|| app_err(format!("Couldn't find version string in package: '{}'!", package)))
+         .ok_or_else(|| app_err(format!("Couldn't find version string in package: '{}'!", lib_package)))
    );
 
-   let dep_strs = match package.get(deps_str) {
+   match src_type {
+      "git" => {
+         let commit_hash = try!(
+            source.split('#')
+               .last()
+               .ok_or_else(|| app_err(format!("Couldn't find commit hash in source entry: '{}'!", source)))
+         );
+
+         Ok(SourceKind::Git { lib_name: lib_name.clone(), commit_hash: commit_hash.to_string() })
+      },
+
+      "registry" => {
+         Ok(SourceKind::CratesIo { lib_name: lib_name.clone(), version: version.to_string() })
+      }
+
+      _ => {
+         Err(app_err(format!("Unexpected source type '{}' in package: '{}'!", src_type, lib_package)))
+      }
+   }
+}
+
+fn get_dependencies(lib_package: &toml::TomlTable, lib_name: &String) -> AppResult<Vec<String>>
+{
+   let deps_str = &String::from_str("dependencies");
+   let dep_strs = match lib_package.get(deps_str) {
       None => {
          Vec::<&str>::new()
       },
@@ -143,44 +190,51 @@ fn get_dependency(packages: &Vec<&toml::TomlTable>, lib_name: &String) -> AppRes
 
                   if ! ds.is_empty() { Some(ds) } else { None }
                })
-               .ok_or_else(|| app_err(format!("Couldn't get Array of Strings for 'dependencies' entry: '{}'!", package)))
+               .ok_or_else(|| app_err(format!("Couldn't get Array of Strings for 'dependencies' entry: '{}'!", lib_package)))
          )
       }
    };
 
-   let mut dep_names: Vec<&str> = Vec::new();
+   let mut dep_names: Vec<String> = Vec::new();
    for dep_str in dep_strs.iter() {
       let dep_name = try!(
          dep_str.split(' ')
             .nth(0)
+            .map(|d| d.to_string())
             .ok_or_else(|| app_err(format!("Couldn't get name from dependency: '{}'!", dep_str)))
       );
 
       dep_names.push(dep_name);
    }
 
-   let mut deps: Vec<Dependency> = Vec::new();
-   for dep_name in dep_names.iter() {
-      deps.push(try!(get_dependency(packages, &dep_name.to_string())));
-   }
+   Ok(dep_names)
+}
 
-   match src_type {
-      "git" => {
-         let commit_hash = try!(
-            source.split('#')
-               .last()
-               .ok_or_else(|| app_err(format!("Couldn't find commit hash in source entry: '{}'!", source)))
-         );
+fn find_package<'a>(packages: &'a Vec<&toml::TomlTable>, lib_name: &String) -> AppResult<&'a toml::TomlTable>
+{
+   let name_str = &String::from_str("name");
 
-         Ok(Dependency::Git { lib_name: lib_name.clone(), commit_hash: commit_hash.to_string(), dependencies: deps })
-      },
+   let package = try!(
+      packages.iter()
+         .find(|t| t.get(name_str).and_then(|n| n.as_str()) == Some(lib_name[]))
+         .ok_or_else(|| app_err(format!("Couldn't find package with name = '{}'!", lib_name)))
+   );
 
-      "registry" => {
-         Ok(Dependency::CratesIo { lib_name: lib_name.clone(), version: version.to_string(), dependencies: deps })
-      }
+   Ok(*package)
+}
 
-      _ => {
-         Err(app_err(format!("Unexpected source type '{}' in package: '{}'!", src_type, package)))
+impl Show for TagsRoot
+{
+   fn fmt(&self, f: &mut Formatter) -> Result<(), Error>
+   {
+      match *self {
+         TagsRoot::Src { ref src_dir, ref dependencies } => {
+            write!(f, "Src ( src_dir: {}, dependencies: {} )", src_dir.display(), dependencies)
+         },
+
+         TagsRoot::Lib { ref src_kind, ref dependencies } => {
+            write!(f, "Lib ( src_kind: {}, dependencies: {} )", src_kind, dependencies)
+         }
       }
    }
 }

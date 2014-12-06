@@ -16,7 +16,8 @@ use std::os;
 use app_result::{AppResult, app_err};
 
 use dependencies::{
-   Dependency,
+   TagsRoot,
+   SourceKind,
    read_dependencies
 };
 
@@ -48,35 +49,71 @@ fn update_tags() -> AppResult<()>
 {
    let cwd = try!(os::getcwd());
    let cargo_dir = try!(find_cargo_toml_dir(&cwd));
-   let deps = try!(read_dependencies(&cargo_dir));
+   let tags_roots = try!(read_dependencies(&cargo_dir));
 
-   let mut tag_files: Vec<Path> = Vec::new();
-   for dep in deps.iter() {
-      match *dep {
-         Dependency::Git { ref lib_name, ref commit_hash, .. } => {
-            tag_files.push(try!(update_git_tags(lib_name, commit_hash)).tags_file);
+   for tags_root in tags_roots.iter() {
+      let mut tag_files: Vec<Path> = Vec::new();
+      let mut tag_dir: Option<Path> = None;
+
+      match *tags_root {
+         TagsRoot::Src { ref src_dir, ref dependencies } => {
+            let mut src_tags = src_dir.clone();
+            src_tags.push("rusty.tags");
+            try!(create_tags(src_dir, &src_tags));
+            tag_files.push(src_tags);
+
+            for dep in dependencies.iter() {
+               tag_files.push(try!(update_tags_of(dep)).tags_file);
+            }
+
+            tag_dir = Some(src_dir.clone());
          },
 
-         Dependency::CratesIo { ref lib_name, ref version, .. } => {
-            tag_files.push(try!(update_crates_io_tags(lib_name, version)).tags_file);
+         TagsRoot::Lib { ref src_kind, ref dependencies } => {
+            let lib_tags = try!(update_tags_of(src_kind));
+            if lib_tags.cached {
+               continue;
+            }
+
+            tag_files.push(lib_tags.tags_file);
+            for dep in dependencies.iter() {
+               tag_files.push(try!(update_tags_of(dep)).tags_file);
+            }
+
+            tag_dir = Some(lib_tags.src_dir.clone());
          }
       }
+
+      if tag_files.is_empty() || tag_dir.is_none() {
+         continue;
+      }
+
+      let mut rust_tags = try!(tags_dir());
+      rust_tags.push("rust");
+      if rust_tags.is_file() {
+         tag_files.push(rust_tags);
+      }
+
+      let mut tags_file = tag_dir.unwrap();
+      tags_file.push("rusty.tags");
+
+      try!(merge_tags(&tag_files, &tags_file));
    }
-
-   let mut src_tags = cargo_dir.clone();
-   src_tags.push("rusty.tags");
-   try!(create_tags(&cargo_dir, &src_tags));
-   tag_files.push(src_tags.clone());
-
-   let mut rust_tags = try!(tags_dir());
-   rust_tags.push("rust");
-   if rust_tags.is_file() {
-      tag_files.push(rust_tags);
-   }
-
-   try!(merge_tags(&tag_files, &src_tags));
 
    Ok(())
+}
+
+fn update_tags_of(src_kind: &SourceKind) -> AppResult<Tags>
+{
+   match *src_kind {
+      SourceKind::Git { ref lib_name, ref commit_hash } => {
+         update_git_tags(lib_name, commit_hash)
+      },
+
+      SourceKind::CratesIo { ref lib_name, ref version } => {
+         update_crates_io_tags(lib_name, version)
+      }
+   }
 }
 
 /// Searches for a directory containing a `Cargo.toml` file starting at
