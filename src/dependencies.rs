@@ -21,7 +21,6 @@ pub enum TagsRoot
    }
 }
 
-#[deriving(Show)]
 pub enum SourceKind
 {
    /// the source is from a git repository
@@ -234,6 +233,22 @@ impl Show for TagsRoot
 
          TagsRoot::Lib { ref src_kind, ref dependencies } => {
             write!(f, "Lib ( src_kind: {}, dependencies: {} )", src_kind, dependencies)
+         }
+      }
+   }
+}
+
+impl Show for SourceKind
+{
+   fn fmt(&self, f: &mut Formatter) -> Result<(), Error>
+   {
+      match *self {
+         SourceKind::Git { ref lib_name, ref commit_hash } => {
+            write!(f, "{}#{}", lib_name, commit_hash)
+         },
+
+         SourceKind::CratesIo { ref lib_name, ref version } => {
+            write!(f, "{}-{}", lib_name, version)
          }
       }
    }
