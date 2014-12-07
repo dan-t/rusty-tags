@@ -24,11 +24,11 @@ pub fn update_tags(src_kind: &SourceKind, tags_kind: &TagsKind) -> AppResult<Tag
 
    let src_dir = try!(find_src_dir(src_kind));
    if src_tags.is_file() {
-      return Ok(Tags { src_dir: src_dir, tags_file: src_tags, cached: true });
+      return Ok(Tags::new(&src_dir, &src_tags, true));
    }
 
    try!(create_tags(&src_dir, tags_kind, &src_tags));
-   Ok(Tags { src_dir: src_dir, tags_file: src_tags, cached: false })
+   Ok(Tags::new(&src_dir, &src_tags, false))
 }
 
 /// Does the same thing as `update_tags`, but also checks if the `lib.rs`

@@ -106,11 +106,16 @@ pub struct Tags
 
    /// indicates if the tags file is already existing
    /// and the cached tags file is returned
-   pub cached: bool
+   cached: bool
 }
 
 impl Tags
 {
+   pub fn new(src_dir: &Path, tags_file: &Path, cached: bool) -> Tags
+   {
+      Tags { src_dir: src_dir.clone(), tags_file: tags_file.clone(), cached: cached }
+   }
+
    pub fn is_up_to_date(&self, tags_kind: &TagsKind) -> bool
    {
       if ! self.cached {
