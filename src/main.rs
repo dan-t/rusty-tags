@@ -62,12 +62,8 @@ fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
 
          TagsRoot::Lib { ref src_kind, ref dependencies } => {
             let lib_tags = try!(update_tags_and_check_for_reexports(src_kind, dependencies, tags_kind));
-            if lib_tags.cached {
-               let mut src_tags = lib_tags.src_dir.clone();
-               src_tags.push(tags_kind.tags_file_name());
-               if src_tags.is_file() {
-                  continue;
-               }
+            if lib_tags.is_up_to_date(tags_kind) {
+               continue;
             }
 
             tag_files.push(lib_tags.tags_file);

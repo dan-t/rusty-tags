@@ -1,3 +1,4 @@
+use std::io::fs::PathExtensions;
 use std::fmt::{Show, Formatter, Error};
 
 pub enum TagsRoot
@@ -106,6 +107,21 @@ pub struct Tags
    /// indicates if the tags file is already existing
    /// and the cached tags file is returned
    pub cached: bool
+}
+
+impl Tags
+{
+   pub fn is_up_to_date(&self, tags_kind: &TagsKind) -> bool
+   {
+      if ! self.cached {
+         return false;
+      }
+
+      let mut src_tags = self.src_dir.clone();
+      src_tags.push(tags_kind.tags_file_name());
+
+      src_tags.is_file()
+   }
 }
 
 impl Show for Tags

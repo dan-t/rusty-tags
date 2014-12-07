@@ -40,7 +40,7 @@ pub fn update_tags_and_check_for_reexports(src_kind: &SourceKind,
                                            tags_kind: &TagsKind) -> AppResult<Tags>
 {
    let lib_tags = try!(update_tags(src_kind, tags_kind));
-   if lib_tags.cached {
+   if lib_tags.is_up_to_date(tags_kind) {
       return Ok(lib_tags);
    }
 
