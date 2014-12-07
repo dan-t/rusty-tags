@@ -4,7 +4,7 @@ use std::io::process::Command;
 use std::collections::HashSet;
 
 use app_result::{AppResult, app_err};
-use types::{Tags, SourceKind};
+use types::{Tags, TagsKind, SourceKind};
 
 use dirs::{
    rusty_tags_cache_dir,
@@ -15,19 +15,19 @@ use dirs::{
 
 /// Checks if there's already a tags file for `src_kind`
 /// and if not it's creating a new tags file and returning it.
-pub fn update_tags(src_kind: &SourceKind) -> AppResult<Tags>
+pub fn update_tags(src_kind: &SourceKind, tags_kind: &TagsKind) -> AppResult<Tags>
 {
    let cache_dir = try!(rusty_tags_cache_dir());
 
    let mut src_tags = cache_dir.clone();
-   src_tags.push(src_kind.tags_file_name());
+   src_tags.push(src_kind.tags_file_name(tags_kind));
 
    let src_dir = try!(find_src_dir(src_kind));
    if src_tags.is_file() {
       return Ok(Tags { src_dir: src_dir, tags_file: src_tags, cached: true });
    }
 
-   try!(create_tags(&src_dir, &src_tags));
+   try!(create_tags(&src_dir, tags_kind, &src_tags));
    Ok(Tags { src_dir: src_dir, tags_file: src_tags, cached: false })
 }
 
@@ -35,9 +35,11 @@ pub fn update_tags(src_kind: &SourceKind) -> AppResult<Tags>
 /// file of the library has public reexports of external crates. If
 /// that's the case, then the tags of the public reexported external
 /// crates are merged into the tags of the library.
-pub fn update_tags_and_check_for_reexports(src_kind: &SourceKind, dependencies: &Vec<SourceKind>) -> AppResult<Tags>
+pub fn update_tags_and_check_for_reexports(src_kind: &SourceKind,
+                                           dependencies: &Vec<SourceKind>,
+                                           tags_kind: &TagsKind) -> AppResult<Tags>
 {
-   let lib_tags = try!(update_tags(src_kind));
+   let lib_tags = try!(update_tags(src_kind, tags_kind));
    if lib_tags.cached {
       return Ok(lib_tags);
    }
@@ -56,7 +58,7 @@ pub fn update_tags_and_check_for_reexports(src_kind: &SourceKind, dependencies: 
    let mut crate_tags = Vec::<Path>::new();
    for rcrate in reexp_crates.iter() {
       if let Some(crate_dep) = dependencies.iter().find(|d| d.get_lib_name() == *rcrate) {
-         crate_tags.push(try!(update_tags(crate_dep)).tags_file.clone());
+         crate_tags.push(try!(update_tags(crate_dep, tags_kind)).tags_file.clone());
       }
    }
 
@@ -107,10 +109,14 @@ pub fn merge_tags(tag_files: &Vec<Path>, into_tag_file: &Path) -> AppResult<()>
 
 /// creates tags recursive for the directory hierarchy starting at `src_dir`
 /// and writes them to `tags_file`
-pub fn create_tags(src_dir: &Path, tags_file: &Path) -> AppResult<()>
+pub fn create_tags(src_dir: &Path, tags_kind: &TagsKind, tags_file: &Path) -> AppResult<()>
 {
    let mut cmd = Command::new("ctags");
+
+   tags_kind.ctags_option().map(|opt| { cmd.arg(opt); () });
+
    cmd.arg("--recurse")
+      .arg("--languages=Rust")
       .arg("--langdef=Rust")
       .arg("--langmap=Rust:.rs")
       .arg("--regex-Rust=/^[ \\t]*(#\\[[^\\]]\\][ \\t]*)*(pub[ \\t]+)?(extern[ \\t]+)?(\"[^\"]+\"[ \\t]+)?(unsafe[ \\t]+)?fn[ \\t]+([a-zA-Z0-9_]+)/\\6/f,functions,function definitions/")

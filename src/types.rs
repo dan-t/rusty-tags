@@ -51,15 +51,15 @@ pub enum SourceKind
 
 impl SourceKind
 {
-   pub fn tags_file_name(&self) -> String
+   pub fn tags_file_name(&self, tags_kind: &TagsKind) -> String
    {
       match *self {
          SourceKind::Git { ref lib_name, ref commit_hash } => {
-            format!("{}-{}", lib_name, commit_hash)
+            format!("{}-{}.{}", lib_name, commit_hash, tags_kind.tags_file_extension())
          },
 
          SourceKind::CratesIo { ref lib_name, ref version } => {
-            format!("{}-{}", lib_name, version)
+            format!("{}-{}.{}", lib_name, version, tags_kind.tags_file_extension())
          }
       }
    }
@@ -108,12 +108,38 @@ pub struct Tags
    pub cached: bool
 }
 
-
 impl Show for Tags
 {
    fn fmt(&self, f: &mut Formatter) -> Result<(), Error>
    {
       write!(f, "Tags ( src_dir: {}, tags_file: {}, cached: {} )",
              self.src_dir.display(), self.tags_file.display(), self.cached)
+   }
+}
+
+/// which kind of tags are created
+#[deriving(Eq, PartialEq, Show)]
+pub enum TagsKind
+{
+   Vi,
+   Emacs
+}
+
+impl TagsKind
+{
+   pub fn tags_file_extension(&self) -> &'static str
+   {
+      match *self {
+         TagsKind::Vi    => "vi",
+         TagsKind::Emacs => "emacs"
+      }
+   }
+
+   pub fn ctags_option(&self) -> Option<&'static str>
+   {
+      match *self {
+         TagsKind::Vi    => None,
+         TagsKind::Emacs => Some("-e")
+      }
    }
 }

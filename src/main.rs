@@ -8,7 +8,7 @@ use std::os;
 
 use app_result::{AppResult, app_err};
 use dependencies::read_dependencies;
-use types::TagsRoot;
+use types::{TagsRoot, TagsKind};
 
 use tags::{
    update_tags,
@@ -27,18 +27,23 @@ mod types;
 
 fn main() 
 {
-   update_all_tags().unwrap_or_else(|err| {
+   update_all_tags(&TagsKind::Vi).unwrap_or_else(|err| {
       let stderr = &mut io::stderr();
       let _ = writeln!(stderr, "rusty-tags: {}", err);
       os::set_exit_status(1);
    });
 }
 
-fn update_all_tags() -> AppResult<()>
+fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
 {
    let cwd = try!(os::getcwd());
    let cargo_dir = try!(find_cargo_toml_dir(&cwd));
    let tags_roots = try!(read_dependencies(&cargo_dir));
+
+   let rusty_tags_file_name_string = rusty_tags_file_name(tags_kind);
+   let rusty_tags_file_name = rusty_tags_file_name_string.as_slice();
+
+   let rust_std_lib_tags_file = try!(rust_std_lib_tags_file(tags_kind));
 
    for tags_root in tags_roots.iter() {
       let mut tag_files: Vec<Path> = Vec::new();
@@ -47,22 +52,22 @@ fn update_all_tags() -> AppResult<()>
       match *tags_root {
          TagsRoot::Src { ref src_dir, ref dependencies } => {
             let mut src_tags = src_dir.clone();
-            src_tags.push(rusty_tags_file_name());
-            try!(create_tags(src_dir, &src_tags));
+            src_tags.push(rusty_tags_file_name);
+            try!(create_tags(src_dir, tags_kind, &src_tags));
             tag_files.push(src_tags);
 
             for dep in dependencies.iter() {
-               tag_files.push(try!(update_tags(dep)).tags_file);
+               tag_files.push(try!(update_tags(dep, tags_kind)).tags_file);
             }
 
             tag_dir = Some(src_dir.clone());
          },
 
          TagsRoot::Lib { ref src_kind, ref dependencies } => {
-            let lib_tags = try!(update_tags_and_check_for_reexports(src_kind, dependencies));
+            let lib_tags = try!(update_tags_and_check_for_reexports(src_kind, dependencies, tags_kind));
             if lib_tags.cached {
                let mut src_tags = lib_tags.src_dir.clone();
-               src_tags.push(rusty_tags_file_name());
+               src_tags.push(rusty_tags_file_name);
                if src_tags.is_file() {
                   continue;
                }
@@ -71,7 +76,7 @@ fn update_all_tags() -> AppResult<()>
             tag_files.push(lib_tags.tags_file);
 
             for dep in dependencies.iter() {
-               tag_files.push(try!(update_tags(dep)).tags_file);
+               tag_files.push(try!(update_tags(dep, tags_kind)).tags_file);
             }
 
             tag_dir = Some(lib_tags.src_dir.clone());
@@ -82,14 +87,12 @@ fn update_all_tags() -> AppResult<()>
          continue;
       }
 
-      let mut rust_tags = try!(rusty_tags_dir());
-      rust_tags.push("rust");
-      if rust_tags.is_file() {
-         tag_files.push(rust_tags);
+      if rust_std_lib_tags_file.is_file() {
+         tag_files.push(rust_std_lib_tags_file.clone());
       }
 
       let mut tags_file = tag_dir.unwrap();
-      tags_file.push(rusty_tags_file_name());
+      tags_file.push(rusty_tags_file_name);
 
       try!(merge_tags(&tag_files, &tags_file));
    }
@@ -121,7 +124,16 @@ fn find_cargo_toml_dir(start_dir: &Path) -> AppResult<Path>
 }
 
 /// the name under which the tags files are saved
-fn rusty_tags_file_name() -> &'static str
+fn rusty_tags_file_name(tags_kind: &TagsKind) -> String
 {
-   "rusty.tags"
+   format!("rusty-tags.{}", tags_kind.tags_file_extension())
+}
+
+/// the tags file containing the tags for the rust standard library
+fn rust_std_lib_tags_file(tags_kind: &TagsKind) -> AppResult<Path>
+{
+   let mut tags_file = try!(rusty_tags_dir());
+   tags_file.push(format!("rust-std-lib.{}", tags_kind.tags_file_extension()));
+
+   Ok(tags_file)
 }
