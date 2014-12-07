@@ -80,7 +80,7 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
          .and_then(|slice| {
             let tables = slice.iter()
                .filter_map(|value| value.as_table())
-               .collect::<Vec<&toml::TomlTable>>();
+               .collect::<Vec<&toml::Table>>();
 
             if ! tables.is_empty() { Some(tables) } else { None }
          })
@@ -108,7 +108,7 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
    let mut lib_src_kinds: Vec<SourceKind> = Vec::new();
    for (lib_name, value) in deps_table.iter() {
       match *value {
-         toml::String(_) | toml::Table(_) => {
+         toml::Value::String(_) | toml::Value::Table(_) => {
             let lib_package = try!(find_package(&packages, lib_name));
             lib_src_kinds.push(try!(get_source_kind(lib_package, lib_name)));
          }
@@ -126,7 +126,7 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
    Ok(tags_roots)
 }
 
-fn get_source_kind(lib_package: &toml::TomlTable, lib_name: &String) -> AppResult<SourceKind>
+fn get_source_kind(lib_package: &toml::Table, lib_name: &String) -> AppResult<SourceKind>
 {
    let version_str = &String::from_str("version");
    let source_str = &String::from_str("source");
@@ -170,7 +170,7 @@ fn get_source_kind(lib_package: &toml::TomlTable, lib_name: &String) -> AppResul
    }
 }
 
-fn get_dependencies(lib_package: &toml::TomlTable) -> AppResult<Vec<String>>
+fn get_dependencies(lib_package: &toml::Table) -> AppResult<Vec<String>>
 {
    let deps_str = &String::from_str("dependencies");
    let dep_strs = match lib_package.get(deps_str) {
@@ -208,7 +208,7 @@ fn get_dependencies(lib_package: &toml::TomlTable) -> AppResult<Vec<String>>
    Ok(dep_names)
 }
 
-fn find_package<'a>(packages: &'a Vec<&toml::TomlTable>, lib_name: &String) -> AppResult<&'a toml::TomlTable>
+fn find_package<'a>(packages: &'a Vec<&toml::Table>, lib_name: &String) -> AppResult<&'a toml::Table>
 {
    let name_str = &String::from_str("name");
 
