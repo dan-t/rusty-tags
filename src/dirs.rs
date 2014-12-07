@@ -6,8 +6,25 @@ use glob::{glob, Paths};
 
 use app_result::{AppResult, app_err};
 
-/// where `rusty-tags` saves its tag files
-pub fn tags_dir() -> AppResult<Path>
+/// where `rusty-tags` caches its tag files
+pub fn rusty_tags_cache_dir() -> AppResult<Path>
+{
+   let dir = try!(
+      rusty_tags_dir().map(|mut d| {
+         d.push("cache");
+         d
+      })
+   );
+
+   if ! dir.is_dir() {
+      try!(fs::mkdir_recursive(&dir, io::USER_RWX));
+   }
+
+   Ok(dir)
+}
+
+/// where rusty-tags puts all of its stuff
+pub fn rusty_tags_dir() -> AppResult<Path>
 {
    let dir = try!(
       homedir().map(|mut d| {
@@ -24,7 +41,7 @@ pub fn tags_dir() -> AppResult<Path>
 }
 
 /// where cargo puts its git checkouts
-pub fn git_src_dir() -> AppResult<Path>
+pub fn cargo_git_src_dir() -> AppResult<Path>
 {
    cargo_dir().map(|mut d| {
       d.push("git");
@@ -34,7 +51,7 @@ pub fn git_src_dir() -> AppResult<Path>
 }
 
 /// where cargo puts the source code of crates.io
-pub fn crates_io_src_dir() -> AppResult<Path>
+pub fn cargo_crates_io_src_dir() -> AppResult<Path>
 {
    let src_dir = try!(
       cargo_dir().map(|mut d| {
@@ -54,16 +71,15 @@ pub fn crates_io_src_dir() -> AppResult<Path>
    Ok(paths.nth(0).unwrap())
 }
 
-
-pub fn glob_path(pattern: &Path) -> Paths
-{
-   glob(pattern.as_str().unwrap())
-}
-
 /// where cargo puts all of its stuff
 fn cargo_dir() -> AppResult<Path>
 {
    homedir().map(|mut d| { d.push(".cargo"); d })
+}
+
+pub fn glob_path(pattern: &Path) -> Paths
+{
+   glob(pattern.as_str().unwrap())
 }
 
 fn homedir() -> AppResult<Path>

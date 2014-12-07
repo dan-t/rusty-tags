@@ -35,6 +35,22 @@ pub enum SourceKind
    }
 }
 
+impl SourceKind
+{
+   pub fn tags_file_name(&self) -> String
+   {
+      match *self {
+         SourceKind::Git { ref lib_name, ref commit_hash } => {
+            format!("{}#{}", lib_name, commit_hash)
+         },
+
+         SourceKind::CratesIo { ref lib_name, ref version } => {
+            format!("{}-{}", lib_name, version)
+         }
+      }
+   }
+}
+
 pub type TagsRoots = Vec<TagsRoot>;
 
 /// Reads the dependecies from the `Cargo.toml` located in `cargo_toml_dir`

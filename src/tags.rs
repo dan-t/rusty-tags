@@ -4,11 +4,12 @@ use std::io::process::Command;
 use std::fmt::{Show, Formatter, Error};
 
 use app_result::{AppResult, app_err};
+use dependencies::SourceKind;
 
 use dirs::{
-   tags_dir,
-   git_src_dir,
-   crates_io_src_dir,
+   rusty_tags_cache_dir,
+   cargo_git_src_dir,
+   cargo_crates_io_src_dir,
    glob_path
 };
 
@@ -26,95 +27,26 @@ pub struct Tags
    pub cached: bool
 }
 
-/// Checks if there's already a tags file for `lib_name` and `commit_hash`
+/// Checks if there's already a tags file for `src_kind`
 /// and if not it's creating a new tags file and returning it.
-pub fn update_git_tags(lib_name: &String, commit_hash: &String) -> AppResult<Tags>
+pub fn update_tags(src_kind: &SourceKind) -> AppResult<Tags>
 {
-   let mut lib_tags = lib_name.clone();
-   lib_tags.push('-');
-   lib_tags.push_str(&**commit_hash);
+   let cache_dir = try!(rusty_tags_cache_dir());
 
-   let mut tags_file = try!(tags_dir());
-   tags_file.push(&lib_tags);
+   let mut src_tags = cache_dir.clone();
+   src_tags.push(src_kind.tags_file_name());
 
-   let mut lib_src = lib_name.clone();
-   lib_src.push_str("-*");
-
-   let mut src_dir = try!(git_src_dir());
-   src_dir.push(&lib_src);
-   src_dir.push("master");
-
-   let mut src_paths = glob_path(&src_dir);
-   for src_path in src_paths {
-      let src_commit_hash = try!(get_commit_hash(&src_path));
-      if *commit_hash == src_commit_hash {
-         let mut cached = true;
-         if ! tags_file.is_file() {
-            try!(create_tags(&src_path, &tags_file));
-            cached = false;
-         }
-
-         return Ok(Tags { src_dir: src_path.clone(), tags_file: tags_file, cached: cached });
-      }
+   let src_dir = try!(find_src_dir(src_kind));
+   if src_tags.is_file() {
+      return Ok(Tags { src_dir: src_dir, tags_file: src_tags, cached: true });
    }
 
-   // the git repository name hasn't to match the name of the library,
-   // so here we're just going through all git directories and searching
-   // for the one with a matching commit hash
-   let mut src_dir = try!(git_src_dir());
-   src_dir.push("*");
-   src_dir.push("master");
-
-   let mut src_paths = glob_path(&src_dir);
-   for src_path in src_paths {
-      let src_commit_hash = try!(get_commit_hash(&src_path));
-      if *commit_hash == src_commit_hash {
-         let mut cached = true;
-         if ! tags_file.is_file() {
-            try!(create_tags(&src_path, &tags_file));
-            cached = false;
-         }
-
-         return Ok(Tags { src_dir: src_path.clone(), tags_file: tags_file, cached: cached });
-      }
-   }
-
-   Err(app_err(format!("
-   Couldn't find git repository of the dependency '{}'!
-   Have you run 'cargo build' at least once after adding the dependency?", lib_name)))
+   try!(create_tags(&src_dir, &src_tags));
+   Ok(Tags { src_dir: src_dir, tags_file: src_tags, cached: false })
 }
 
-/// Checks if there's already a tags file for `lib_name` and `version`
-/// and if not it's creating a new tags file and returning it.
-pub fn update_crates_io_tags(lib_name: &String, version: &String) -> AppResult<Tags>
-{
-   let mut lib_tags = lib_name.clone();
-   lib_tags.push('-');
-   lib_tags.push_str(&**version);
-
-   let mut tags_file = try!(tags_dir());
-   tags_file.push(&lib_tags);
-
-   let mut src_dir = try!(crates_io_src_dir());
-   src_dir.push(&lib_tags);
-
-   if ! src_dir.is_dir() {
-      return Err(app_err(format!("
-   Couldn't find source code of the dependency '{}'!
-   Have you run 'cargo build' at least once after adding the dependency?", lib_name)));
-   }
-
-   let mut cached = true;
-   if ! tags_file.is_file() {
-      try!(create_tags(&src_dir, &tags_file));
-      cached = false;
-   }
-
-   Ok(Tags { src_dir: src_dir, tags_file: tags_file, cached: cached })
-}
-
-/// merges `tag_files` into `merged_tag_file`
-pub fn merge_tags(tag_files: &Vec<Path>, merged_tag_file: &Path) -> AppResult<()>
+/// merges `tag_files` into `into_tag_file`
+pub fn merge_tags(tag_files: &Vec<Path>, into_tag_file: &Path) -> AppResult<()>
 {
    println!("Merging ...\n   tags:");
 
@@ -124,7 +56,7 @@ pub fn merge_tags(tag_files: &Vec<Path>, merged_tag_file: &Path) -> AppResult<()
       file_contents.push(try!(io::File::open(file).read_to_string()));
    }
 
-   println!("\n   into:\n      {}\n", merged_tag_file.display());
+   println!("\n   into:\n      {}\n", into_tag_file.display());
 
    let mut merged_lines: Vec<&str> = Vec::with_capacity(100_000);
    for content in file_contents.iter() {
@@ -137,7 +69,7 @@ pub fn merge_tags(tag_files: &Vec<Path>, merged_tag_file: &Path) -> AppResult<()
 
    merged_lines.sort();
 
-   let mut tag_file = try!(io::File::open_mode(merged_tag_file, io::Truncate, io::ReadWrite));
+   let mut tag_file = try!(io::File::open_mode(into_tag_file, io::Truncate, io::ReadWrite));
    try!(tag_file.write_line("!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;\" to lines/"));
    try!(tag_file.write_line("!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/"));
 
@@ -174,6 +106,67 @@ pub fn create_tags(src_dir: &Path, tags_file: &Path) -> AppResult<()>
 
    try!(cmd.output());
    Ok(())
+}
+
+/// find the source directory of `src_kind`, for git sources the directories
+/// in `~/.cargo/git/checkouts` are considered and for crates.io sources
+/// the directories in `~/.cargo/registry/src/github.com-*` are considered
+fn find_src_dir(src_kind: &SourceKind) -> AppResult<Path>
+{
+   match *src_kind {
+      SourceKind::Git { ref lib_name, ref commit_hash } => {
+         let mut lib_src = lib_name.clone();
+         lib_src.push_str("-*");
+
+         let mut src_dir = try!(cargo_git_src_dir());
+         src_dir.push(&lib_src);
+         src_dir.push("master");
+
+         let mut src_paths = glob_path(&src_dir);
+         for src_path in src_paths {
+            let src_commit_hash = try!(get_commit_hash(&src_path));
+            if *commit_hash == src_commit_hash {
+               return Ok(src_path);
+            }
+         }
+
+         // the git repository name hasn't to match the name of the library,
+         // so here we're just going through all git directories and searching
+         // for the one with a matching commit hash
+         let mut src_dir = try!(cargo_git_src_dir());
+         src_dir.push("*");
+         src_dir.push("master");
+
+         let mut src_paths = glob_path(&src_dir);
+         for src_path in src_paths {
+            let src_commit_hash = try!(get_commit_hash(&src_path));
+            if *commit_hash == src_commit_hash {
+               return Ok(src_path);
+            }
+         }
+
+         Err(app_err(format!("
+   Couldn't find git repository of the dependency '{}'!
+   Have you run 'cargo build' at least once or have you added/updated a dependency without calling 'cargo build' again?", lib_name)))
+      },
+
+      SourceKind::CratesIo { ref lib_name, ref version } => {
+         let mut lib_src = lib_name.clone();
+         lib_src.push('-');
+         lib_src.push_str(&**version);
+
+         let mut src_dir = try!(cargo_crates_io_src_dir());
+         src_dir.push(&lib_src);
+
+         if ! src_dir.is_dir() {
+            return Err(app_err(format!("
+   Couldn't find source code of the dependency '{}'!
+   Have you run 'cargo build' at least once or have you added/updated a dependency without calling 'cargo build' again?", lib_name)))
+         }
+
+         Ok(src_dir)
+      }
+   }
 }
 
 /// get the commit hash of the current `HEAD` of the git repository located at `git_dir`

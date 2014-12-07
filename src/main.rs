@@ -10,19 +10,16 @@ use app_result::{AppResult, app_err};
 
 use dependencies::{
    TagsRoot,
-   SourceKind,
    read_dependencies
 };
 
 use tags::{
-   Tags,
-   update_git_tags,
-   update_crates_io_tags,
+   update_tags,
    create_tags,
    merge_tags
 };
 
-use dirs::tags_dir;
+use dirs::rusty_tags_dir;
 
 mod app_result;
 mod dependencies;
@@ -31,14 +28,14 @@ mod tags;
 
 fn main() 
 {
-   update_tags().unwrap_or_else(|err| {
+   update_all_tags().unwrap_or_else(|err| {
       let stderr = &mut io::stderr();
       let _ = writeln!(stderr, "rusty-tags: {}", err);
       os::set_exit_status(1);
    });
 }
 
-fn update_tags() -> AppResult<()>
+fn update_all_tags() -> AppResult<()>
 {
    let cwd = try!(os::getcwd());
    let cargo_dir = try!(find_cargo_toml_dir(&cwd));
@@ -56,14 +53,14 @@ fn update_tags() -> AppResult<()>
             tag_files.push(src_tags);
 
             for dep in dependencies.iter() {
-               tag_files.push(try!(update_tags_of(dep)).tags_file);
+               tag_files.push(try!(update_tags(dep)).tags_file);
             }
 
             tag_dir = Some(src_dir.clone());
          },
 
          TagsRoot::Lib { ref src_kind, ref dependencies } => {
-            let lib_tags = try!(update_tags_of(src_kind));
+            let lib_tags = try!(update_tags(src_kind));
             if lib_tags.cached {
                let mut src_tags = lib_tags.src_dir.clone();
                src_tags.push("rusty.tags");
@@ -75,7 +72,7 @@ fn update_tags() -> AppResult<()>
             tag_files.push(lib_tags.tags_file);
 
             for dep in dependencies.iter() {
-               tag_files.push(try!(update_tags_of(dep)).tags_file);
+               tag_files.push(try!(update_tags(dep)).tags_file);
             }
 
             tag_dir = Some(lib_tags.src_dir.clone());
@@ -86,7 +83,7 @@ fn update_tags() -> AppResult<()>
          continue;
       }
 
-      let mut rust_tags = try!(tags_dir());
+      let mut rust_tags = try!(rusty_tags_dir());
       rust_tags.push("rust");
       if rust_tags.is_file() {
          tag_files.push(rust_tags);
@@ -99,19 +96,6 @@ fn update_tags() -> AppResult<()>
    }
 
    Ok(())
-}
-
-fn update_tags_of(src_kind: &SourceKind) -> AppResult<Tags>
-{
-   match *src_kind {
-      SourceKind::Git { ref lib_name, ref commit_hash } => {
-         update_git_tags(lib_name, commit_hash)
-      },
-
-      SourceKind::CratesIo { ref lib_name, ref version } => {
-         update_crates_io_tags(lib_name, version)
-      }
-   }
 }
 
 /// Searches for a directory containing a `Cargo.toml` file starting at
