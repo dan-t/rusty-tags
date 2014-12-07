@@ -49,7 +49,7 @@ fn update_all_tags() -> AppResult<()>
       match *tags_root {
          TagsRoot::Src { ref src_dir, ref dependencies } => {
             let mut src_tags = src_dir.clone();
-            src_tags.push("rusty.tags");
+            src_tags.push(rusty_tags_file_name());
             try!(create_tags(src_dir, &src_tags));
             tag_files.push(src_tags);
 
@@ -64,7 +64,7 @@ fn update_all_tags() -> AppResult<()>
             let lib_tags = try!(update_tags_and_check_for_reexports(src_kind, dependencies));
             if lib_tags.cached {
                let mut src_tags = lib_tags.src_dir.clone();
-               src_tags.push("rusty.tags");
+               src_tags.push(rusty_tags_file_name());
                if src_tags.is_file() {
                   continue;
                }
@@ -91,7 +91,7 @@ fn update_all_tags() -> AppResult<()>
       }
 
       let mut tags_file = tag_dir.unwrap();
-      tags_file.push("rusty.tags");
+      tags_file.push(rusty_tags_file_name());
 
       try!(merge_tags(&tag_files, &tags_file));
    }
@@ -120,4 +120,10 @@ fn find_cargo_toml_dir(start_dir: &Path) -> AppResult<Path>
          return Err(app_err(format!("Couldn't find 'Cargo.toml' starting at directory '{}'!", start_dir.display())));
       }
    }
+}
+
+/// the name under which the tags files are saved
+fn rusty_tags_file_name() -> &'static str
+{
+   "rusty.tags"
 }
