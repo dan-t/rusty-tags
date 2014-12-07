@@ -53,6 +53,9 @@ pub fn update_tags(src_kind: &SourceKind) -> AppResult<Tags>
 pub fn update_tags_and_check_for_reexports(src_kind: &SourceKind, dependencies: &Vec<SourceKind>) -> AppResult<Tags>
 {
    let lib_tags = try!(update_tags(src_kind));
+   if lib_tags.cached {
+      return Ok(lib_tags);
+   }
 
    let reexp_crates = try!(find_reexported_crates(&lib_tags.src_dir));
    if reexp_crates.is_empty() {
