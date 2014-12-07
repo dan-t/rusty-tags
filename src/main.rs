@@ -7,11 +7,8 @@ use std::io;
 use std::os;
 
 use app_result::{AppResult, app_err};
-
-use dependencies::{
-   TagsRoot,
-   read_dependencies
-};
+use dependencies::read_dependencies;
+use types::TagsRoot;
 
 use tags::{
    update_tags,
@@ -26,6 +23,7 @@ mod app_result;
 mod dependencies;
 mod dirs;
 mod tags;
+mod types;
 
 fn main() 
 {

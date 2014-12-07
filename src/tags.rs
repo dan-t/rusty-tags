@@ -1,11 +1,10 @@
 use std::io;
 use std::io::fs::PathExtensions;
 use std::io::process::Command;
-use std::fmt::{Show, Formatter, Error};
 use std::collections::HashSet;
 
 use app_result::{AppResult, app_err};
-use dependencies::SourceKind;
+use types::{Tags, SourceKind};
 
 use dirs::{
    rusty_tags_cache_dir,
@@ -13,20 +12,6 @@ use dirs::{
    cargo_crates_io_src_dir,
    glob_path
 };
-
-pub struct Tags
-{
-   /// the root directory of the source code
-   /// for which the tags have been created
-   pub src_dir: Path,
-
-   /// the tags file of the sources in `src_dir`
-   pub tags_file: Path,
-
-   /// indicates if the tags file is already existing
-   /// and the cached tags file is returned
-   pub cached: bool
-}
 
 /// Checks if there's already a tags file for `src_kind`
 /// and if not it's creating a new tags file and returning it.
@@ -283,13 +268,4 @@ fn get_commit_hash(git_dir: &Path) -> AppResult<String>
    String::from_utf8(out.output)
       .map(|s| s.as_slice().trim().to_string())
       .map_err(|_| app_err("Couldn't convert git output to utf8!".to_string()))
-}
-
-impl Show for Tags
-{
-   fn fmt(&self, f: &mut Formatter) -> Result<(), Error>
-   {
-      write!(f, "Tags ( src_dir: {}, tags_file: {}, cached: {} )",
-             self.src_dir.display(), self.tags_file.display(), self.cached)
-   }
 }

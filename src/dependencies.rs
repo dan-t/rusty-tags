@@ -1,70 +1,13 @@
-use std::fmt::{Show, Formatter, Error};
 use std::io;
 use toml;
 
 use app_result::{AppResult, app_err};
 
-pub enum TagsRoot
-{
-   /// the source directory and the dependencies
-   /// of the cargo project
-   Src {
-      src_dir: Path,
-      dependencies: Vec<SourceKind>
-   },
-
-   /// a library and its depedencies
-   Lib {
-      src_kind: SourceKind,
-      dependencies: Vec<SourceKind>
-   }
-}
-
-pub enum SourceKind
-{
-   /// the source is from a git repository
-   Git {
-      lib_name: String,
-      commit_hash: String
-   },
-
-   /// the source is from crates.io
-   CratesIo {
-      lib_name: String,
-      version: String
-   }
-}
-
-impl SourceKind
-{
-   pub fn tags_file_name(&self) -> String
-   {
-      match *self {
-         SourceKind::Git { ref lib_name, ref commit_hash } => {
-            format!("{}-{}", lib_name, commit_hash)
-         },
-
-         SourceKind::CratesIo { ref lib_name, ref version } => {
-            format!("{}-{}", lib_name, version)
-         }
-      }
-   }
-
-   pub fn get_lib_name(&self) -> String
-   {
-      match *self {
-         SourceKind::Git { ref lib_name, .. } => {
-            lib_name.clone()
-         },
-
-         SourceKind::CratesIo { ref lib_name, .. } => {
-            lib_name.clone()
-         }
-      }
-   }
-}
-
-pub type TagsRoots = Vec<TagsRoot>;
+use types::{
+   TagsRoot,
+   TagsRoots,
+   SourceKind
+};
 
 /// Reads the dependecies from the `Cargo.toml` located in `cargo_toml_dir`
 pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
@@ -248,36 +191,4 @@ fn find_package<'a>(packages: &'a Vec<&toml::Table>, lib_name: &String) -> AppRe
    );
 
    Ok(*package)
-}
-
-impl Show for TagsRoot
-{
-   fn fmt(&self, f: &mut Formatter) -> Result<(), Error>
-   {
-      match *self {
-         TagsRoot::Src { ref src_dir, ref dependencies } => {
-            write!(f, "Src ( src_dir: {}, dependencies: {} )", src_dir.display(), dependencies)
-         },
-
-         TagsRoot::Lib { ref src_kind, ref dependencies } => {
-            write!(f, "Lib ( src_kind: {}, dependencies: {} )", src_kind, dependencies)
-         }
-      }
-   }
-}
-
-impl Show for SourceKind
-{
-   fn fmt(&self, f: &mut Formatter) -> Result<(), Error>
-   {
-      match *self {
-         SourceKind::Git { ref lib_name, ref commit_hash } => {
-            write!(f, "{}-{}", lib_name, commit_hash)
-         },
-
-         SourceKind::CratesIo { ref lib_name, ref version } => {
-            write!(f, "{}-{}", lib_name, version)
-         }
-      }
-   }
 }
