@@ -41,7 +41,7 @@ impl SourceKind
    {
       match *self {
          SourceKind::Git { ref lib_name, ref commit_hash } => {
-            format!("{}#{}", lib_name, commit_hash)
+            format!("{}-{}", lib_name, commit_hash)
          },
 
          SourceKind::CratesIo { ref lib_name, ref version } => {
@@ -259,7 +259,7 @@ impl Show for SourceKind
    {
       match *self {
          SourceKind::Git { ref lib_name, ref commit_hash } => {
-            write!(f, "{}#{}", lib_name, commit_hash)
+            write!(f, "{}-{}", lib_name, commit_hash)
          },
 
          SourceKind::CratesIo { ref lib_name, ref version } => {
