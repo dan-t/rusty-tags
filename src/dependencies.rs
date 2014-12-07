@@ -49,6 +49,19 @@ impl SourceKind
          }
       }
    }
+
+   pub fn get_lib_name(&self) -> String
+   {
+      match *self {
+         SourceKind::Git { ref lib_name, .. } => {
+            lib_name.clone()
+         },
+
+         SourceKind::CratesIo { ref lib_name, .. } => {
+            lib_name.clone()
+         }
+      }
+   }
 }
 
 pub type TagsRoots = Vec<TagsRoot>;

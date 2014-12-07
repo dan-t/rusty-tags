@@ -15,6 +15,7 @@ use dependencies::{
 
 use tags::{
    update_tags,
+   update_tags_and_check_for_reexports,
    create_tags,
    merge_tags
 };
@@ -60,7 +61,7 @@ fn update_all_tags() -> AppResult<()>
          },
 
          TagsRoot::Lib { ref src_kind, ref dependencies } => {
-            let lib_tags = try!(update_tags(src_kind));
+            let lib_tags = try!(update_tags_and_check_for_reexports(src_kind, dependencies));
             if lib_tags.cached {
                let mut src_tags = lib_tags.src_dir.clone();
                src_tags.push("rusty.tags");

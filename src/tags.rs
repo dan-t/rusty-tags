@@ -2,6 +2,7 @@ use std::io;
 use std::io::fs::PathExtensions;
 use std::io::process::Command;
 use std::fmt::{Show, Formatter, Error};
+use std::collections::HashSet;
 
 use app_result::{AppResult, app_err};
 use dependencies::SourceKind;
@@ -43,6 +44,41 @@ pub fn update_tags(src_kind: &SourceKind) -> AppResult<Tags>
 
    try!(create_tags(&src_dir, &src_tags));
    Ok(Tags { src_dir: src_dir, tags_file: src_tags, cached: false })
+}
+
+/// Does the same thing as `update_tags`, but also checks if the `lib.rs`
+/// file of the library has public reexports of external crates. If
+/// that's the case, then the tags of the public reexported external
+/// crates are merged into the tags of the library.
+pub fn update_tags_and_check_for_reexports(src_kind: &SourceKind, dependencies: &Vec<SourceKind>) -> AppResult<Tags>
+{
+   let lib_tags = try!(update_tags(src_kind));
+
+   let reexp_crates = try!(find_reexported_crates(&lib_tags.src_dir));
+   if reexp_crates.is_empty() {
+      return Ok(lib_tags);
+   }
+
+   println!("Found public reexports in '{}' of:", src_kind.get_lib_name());
+   for rcrate in reexp_crates.iter() {
+      println!("   {}", rcrate);
+   }
+   println!("");
+
+   let mut crate_tags = Vec::<Path>::new();
+   for rcrate in reexp_crates.iter() {
+      if let Some(crate_dep) = dependencies.iter().find(|d| d.get_lib_name() == *rcrate) {
+         crate_tags.push(try!(update_tags(crate_dep)).tags_file.clone());
+      }
+   }
+
+   if crate_tags.is_empty() {
+      return Ok(lib_tags);
+   }
+
+   crate_tags.push(lib_tags.tags_file.clone());
+   try!(merge_tags(&crate_tags, &lib_tags.tags_file));
+   Ok(lib_tags)
 }
 
 /// merges `tag_files` into `into_tag_file`
@@ -167,6 +203,68 @@ fn find_src_dir(src_kind: &SourceKind) -> AppResult<Path>
          Ok(src_dir)
       }
    }
+}
+
+type CrateName = String;
+
+/// searches in the file `<src_dir>/src/lib.rs` for external crates
+/// that are reexpored and returns their names
+fn find_reexported_crates(src_dir: &Path) -> AppResult<Vec<CrateName>>
+{
+   let mut lib_file = src_dir.clone();
+   lib_file.push("src");
+   lib_file.push("lib.rs");
+
+   if ! lib_file.is_file() {
+      return Ok(Vec::new());
+   }
+
+   let contents = try!(io::File::open(&lib_file).read_to_string());
+   let mut lines = contents.lines_any();
+
+   type ModuleName = String;
+   let mut pub_uses = HashSet::<ModuleName>::new();
+
+   #[deriving(Eq, PartialEq, Hash)]
+   struct ExternCrate<'a>
+   {
+      name: &'a str,
+      as_name: &'a str
+   }
+
+   let mut extern_crates = HashSet::<ExternCrate>::new();
+
+   for line in lines {
+      let items = line.trim_chars(';').split(' ').collect::<Vec<&str>>();
+      if items.len() < 3 {
+         continue;
+      }
+
+      if items[0] == "pub" && items[1] == "use" {
+         let mods = items[2].split_str("::").collect::<Vec<&str>>();
+         if mods.len() >= 1 {
+            pub_uses.insert(mods[0].to_string());
+         }
+      }
+
+      if items[0] == "extern" && items[1] == "crate" {
+         if items.len() == 3 {
+            extern_crates.insert(ExternCrate { name: items[2].trim_chars('"'), as_name: items[2] });
+         }
+         else if items.len() == 5 && items[3] == "as" {
+            extern_crates.insert(ExternCrate { name: items[2].trim_chars('"'), as_name: items[4] });
+         }
+      }
+   }
+
+   let mut reexp_crates = Vec::<CrateName>::new();
+   for extern_crate in extern_crates.iter() {
+      if pub_uses.contains(extern_crate.as_name) {
+         reexp_crates.push(extern_crate.name.to_string());
+      }
+   }
+
+   Ok(reexp_crates)
 }
 
 /// get the commit hash of the current `HEAD` of the git repository located at `git_dir`
