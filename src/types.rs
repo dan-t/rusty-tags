@@ -135,6 +135,15 @@ impl TagsKind
       }
    }
 
+   /// the name under which the tags files are saved
+   pub fn tags_file_name(&self) -> &'static str
+   {
+      match *self {
+         TagsKind::Vi    => "rusty-tags.vi",
+         TagsKind::Emacs => "rusty-tags.emacs"
+      }
+   }
+
    pub fn ctags_option(&self) -> Option<&'static str>
    {
       match *self {

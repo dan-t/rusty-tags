@@ -40,9 +40,6 @@ fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
    let cargo_dir = try!(find_cargo_toml_dir(&cwd));
    let tags_roots = try!(read_dependencies(&cargo_dir));
 
-   let rusty_tags_file_name_string = rusty_tags_file_name(tags_kind);
-   let rusty_tags_file_name = rusty_tags_file_name_string.as_slice();
-
    let rust_std_lib_tags_file = try!(rust_std_lib_tags_file(tags_kind));
 
    for tags_root in tags_roots.iter() {
@@ -52,7 +49,7 @@ fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
       match *tags_root {
          TagsRoot::Src { ref src_dir, ref dependencies } => {
             let mut src_tags = src_dir.clone();
-            src_tags.push(rusty_tags_file_name);
+            src_tags.push(tags_kind.tags_file_name());
             try!(create_tags(src_dir, tags_kind, &src_tags));
             tag_files.push(src_tags);
 
@@ -67,7 +64,7 @@ fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
             let lib_tags = try!(update_tags_and_check_for_reexports(src_kind, dependencies, tags_kind));
             if lib_tags.cached {
                let mut src_tags = lib_tags.src_dir.clone();
-               src_tags.push(rusty_tags_file_name);
+               src_tags.push(tags_kind.tags_file_name());
                if src_tags.is_file() {
                   continue;
                }
@@ -92,7 +89,7 @@ fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
       }
 
       let mut tags_file = tag_dir.unwrap();
-      tags_file.push(rusty_tags_file_name);
+      tags_file.push(tags_kind.tags_file_name());
 
       try!(merge_tags(&tag_files, &tags_file));
    }
@@ -121,12 +118,6 @@ fn find_cargo_toml_dir(start_dir: &Path) -> AppResult<Path>
          return Err(app_err(format!("Couldn't find 'Cargo.toml' starting at directory '{}'!", start_dir.display())));
       }
    }
-}
-
-/// the name under which the tags files are saved
-fn rusty_tags_file_name(tags_kind: &TagsKind) -> String
-{
-   format!("rusty-tags.{}", tags_kind.tags_file_extension())
 }
 
 /// the tags file containing the tags for the rust standard library
