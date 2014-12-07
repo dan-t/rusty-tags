@@ -107,6 +107,7 @@ pub fn merge_tags(tag_files: &Vec<Path>, into_tag_file: &Path) -> AppResult<()>
    }
 
    merged_lines.sort();
+   merged_lines.dedup();
 
    let mut tag_file = try!(io::File::open_mode(into_tag_file, io::Truncate, io::ReadWrite));
    try!(tag_file.write_line("!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;\" to lines/"));
