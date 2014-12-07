@@ -61,7 +61,7 @@ otherwise you're also getting tags for all of rustcs c code:
     -CTAGS_OPTS=--options="${CFG_SRC_DIR}src/etc/ctags.rust" --languages=-javascript --recurse ${CTAGS_LOCATIONS}
     +CTAGS_OPTS=--options="${CFG_SRC_DIR}src/etc/ctags.rust" --languages=Rust --recurse ${CTAGS_LOCATIONS}
 
-Renaming the tags file, that if you've jumped to of the standard
+Renaming the tags file, that if you've jumped to the standard
 library, that you're able to jump further inside of it, and copying a
 version of the tags, that `rusty-tags` can add it to every tags file it creates: 
 
