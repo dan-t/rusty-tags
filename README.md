@@ -1,14 +1,15 @@
 rusty-tags
 ==========
 
-A command line tool that creates tags for a cargo project and all
+A command line tool that creates tags - for source code navigation by
+using [ctags](<http://ctags.sourceforge.net>) - for a cargo project and all
 of its dependencies.
 
 Prerequisites
 =============
 
-* `ctags` installed
-* `git` installed if git dependencies are used
+* [ctags](<http://ctags.sourceforge.net>) installed
+* [git](<http://git-scm.com/>) installed if git dependencies are used
 
 Installation
 ============
