@@ -99,7 +99,7 @@ Emacs Support
 
 There's now a first version with emacs support.
 
-By repacing every occurrence of `vi` with `emacs` e.g.:
+Replace every occurrence of `vi` with `emacs` in the README e.g.:
 * `rusty-tags vi` => `rusty-tags emacs`
 * `make TAGS.vi` => `make TAGS.emacs`
 * `rusty-tags.vi` => `rusty-tags.emacs`
