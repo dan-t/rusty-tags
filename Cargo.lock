@@ -1,6 +1,6 @@
 [root]
 name = "rusty-tags"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "glob 0.1.0 (git+https://github.com/rust-lang/glob)",
  "toml 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
