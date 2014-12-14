@@ -13,16 +13,16 @@ use dirs::{
    glob_path
 };
 
-/// Checks if there's already a tags file for `src_kind`
+/// Checks if there's already a tags file for `source`
 /// and if not it's creating a new tags file and returning it.
-pub fn update_tags(src_kind: &SourceKind, tags_kind: &TagsKind) -> AppResult<Tags>
+pub fn update_tags(source: &SourceKind, tags_kind: &TagsKind) -> AppResult<Tags>
 {
    let cache_dir = try!(rusty_tags_cache_dir());
 
    let mut src_tags = cache_dir.clone();
-   src_tags.push(src_kind.tags_file_name(tags_kind));
+   src_tags.push(source.tags_file_name(tags_kind));
 
-   let src_dir = try!(find_src_dir(src_kind));
+   let src_dir = try!(find_src_dir(source));
    if src_tags.is_file() {
       return Ok(Tags::new(&src_dir, &src_tags, true));
    }
@@ -35,11 +35,11 @@ pub fn update_tags(src_kind: &SourceKind, tags_kind: &TagsKind) -> AppResult<Tag
 /// file of the library has public reexports of external crates. If
 /// that's the case, then the tags of the public reexported external
 /// crates are merged into the tags of the library.
-pub fn update_tags_and_check_for_reexports(src_kind: &SourceKind,
+pub fn update_tags_and_check_for_reexports(source: &SourceKind,
                                            dependencies: &Vec<SourceKind>,
                                            tags_kind: &TagsKind) -> AppResult<Tags>
 {
-   let lib_tags = try!(update_tags(src_kind, tags_kind));
+   let lib_tags = try!(update_tags(source, tags_kind));
    if lib_tags.is_up_to_date(tags_kind) {
       return Ok(lib_tags);
    }
@@ -49,7 +49,7 @@ pub fn update_tags_and_check_for_reexports(src_kind: &SourceKind,
       return Ok(lib_tags);
    }
 
-   println!("Found public reexports in '{}' of:", src_kind.get_lib_name());
+   println!("Found public reexports in '{}' of:", source.get_lib_name());
    for rcrate in reexp_crates.iter() {
       println!("   {}", rcrate);
    }
@@ -139,12 +139,12 @@ pub fn create_tags(src_dir: &Path, tags_kind: &TagsKind, tags_file: &Path) -> Ap
    Ok(())
 }
 
-/// find the source directory of `src_kind`, for git sources the directories
+/// find the source directory of `source`, for git sources the directories
 /// in `~/.cargo/git/checkouts` are considered and for crates.io sources
 /// the directories in `~/.cargo/registry/src/github.com-*` are considered
-fn find_src_dir(src_kind: &SourceKind) -> AppResult<Path>
+fn find_src_dir(source: &SourceKind) -> AppResult<Path>
 {
-   match *src_kind {
+   match *source {
       SourceKind::Git { ref lib_name, ref commit_hash } => {
          let mut lib_src = lib_name.clone();
          lib_src.push_str("-*");
