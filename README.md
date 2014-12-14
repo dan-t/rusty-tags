@@ -28,7 +28,7 @@ Usage
 the dependencies. If a dependency gets added or updated, then most likely
 `cargo build` has to be called again.
 
-Just calling `rusty-tags` then anywhere inside of a cargo project should
+Just calling `rusty-tags vi` then anywhere inside of a cargo project should
 just work and after its run a `rusty-tags.vi` file should be beside
 of the `Cargo.toml` file.
 
@@ -76,7 +76,7 @@ Vim Configuration
 Put this into your `~/.vim/after/ftplugin/rust.vim` file:
 
     set tags=rusty-tags.vi;/
-    autocmd BufWrite *.rs :silent !rusty-tags
+    autocmd BufWrite *.rs :silent !rusty-tags vi
 
 The first line (only supported by vim >= 7.4) ensures that vim will
 automatically search for a `rusty-tags.vi` file upwards the directory hierarchy.
@@ -88,7 +88,7 @@ The second line ensures that your projects tag file gets updated if a file is wr
 
 Normally you want to call the `rusty-tags` command in the backgroud by adding a `&`:
 
-    autocmd BufWrite *.rs :silent !rusty-tags &
+    autocmd BufWrite *.rs :silent !rusty-tags vi &
 
 But I had sometimes strange behaviours this way that I couldn't track down
 until now. So you can try using it with the `&`, and if it doesn't work,
@@ -97,15 +97,15 @@ if the tags aren't correctly updated, then you know the reason.
 Emacs Support
 =============
 
-I wanted to support vi and emacs style tags by default and almost everything
-in `rusty-tags` is already prepared to support emacs tags, but then, after
-looking at an emacs tags file the first time, I saw, that it's completely
-differently constructed than a vi one.
+There's now a first version with emacs support.
 
-`rusty-tags` caches the tags for every dependency and then merges them.
+By repacing every occurrence of `vi` with `emacs` e.g.:
+* `rusty-tags vi` => `rusty-tags emacs`
+* `make TAGS.vi` => `make TAGS.emacs`
+* `rusty-tags.vi` => `rusty-tags.emacs`
 
-This works nicely for the vi tags, because each entry is in a separate line
-and starts with the keyword, so merging and then sorting them is quite simple.
+Instead of merging the tags files like in the vi case, an `include`
+line is added to the emacs tags file which includes the tags files
+of the dependencies.
 
-So, if there're emacs user that want a working `rusty-tags` and can give some
-hints, then please step forward!
+I haven't tested the emacs tags, so some feedback would be nice!
