@@ -57,18 +57,18 @@ fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
          TagsRoot::Src { ref src_dir, ref dependencies } => {
             let mut src_tags = src_dir.clone();
             src_tags.push(tags_kind.tags_file_name());
-            try!(create_tags(src_dir, tags_kind, &src_tags));
+            try!(create_tags(tags_kind, src_dir, &src_tags));
             tag_files.push(src_tags);
 
             for dep in dependencies.iter() {
-               tag_files.push(try!(update_tags(dep, tags_kind)).tags_file);
+               tag_files.push(try!(update_tags(tags_kind, dep)).tags_file);
             }
 
             tag_dir = Some(src_dir.clone());
          },
 
          TagsRoot::Lib { ref src_kind, ref dependencies } => {
-            let lib_tags = try!(update_tags_and_check_for_reexports(src_kind, dependencies, tags_kind));
+            let lib_tags = try!(update_tags_and_check_for_reexports(tags_kind, src_kind, dependencies));
             if lib_tags.is_up_to_date(tags_kind) {
                continue;
             }
@@ -76,7 +76,7 @@ fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
             tag_files.push(lib_tags.tags_file);
 
             for dep in dependencies.iter() {
-               tag_files.push(try!(update_tags(dep, tags_kind)).tags_file);
+               tag_files.push(try!(update_tags(tags_kind, dep)).tags_file);
             }
 
             tag_dir = Some(lib_tags.src_dir.clone());
