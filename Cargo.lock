@@ -2,17 +2,17 @@
 name = "rusty-tags"
 version = "0.1.0"
 dependencies = [
- "glob 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "toml 0.1.3 (git+https://github.com/alexcrichton/toml-rs)",
+ "glob 0.1.0 (git+https://github.com/rust-lang/glob)",
+ "toml 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "glob"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+source = "git+https://github.com/rust-lang/glob#7e1bd4c5917fde41861ee93e067d5d84d3caf5d1"
 
 [[package]]
 name = "toml"
-version = "0.1.3"
-source = "git+https://github.com/alexcrichton/toml-rs#6e4e8251b1b3b6903ac91a3ff45807de6410c173"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
