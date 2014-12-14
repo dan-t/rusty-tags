@@ -67,41 +67,51 @@ pub fn update_tags_and_check_for_reexports(tags_kind: &TagsKind,
    }
 
    crate_tags.push(lib_tags.tags_file.clone());
-   try!(merge_tags(&crate_tags, &lib_tags.tags_file));
+   try!(merge_tags(tags_kind, &crate_tags, &lib_tags.tags_file));
    Ok(lib_tags)
 }
 
 /// merges `tag_files` into `into_tag_file`
-pub fn merge_tags(tag_files: &Vec<Path>, into_tag_file: &Path) -> AppResult<()>
+pub fn merge_tags(tags_kind: &TagsKind, tag_files: &Vec<Path>, into_tag_file: &Path) -> AppResult<()>
 {
    println!("Merging ...\n   tags:");
 
-   let mut file_contents: Vec<String> = Vec::new();
    for file in tag_files.iter() {
       println!("      {}", file.display());
-      file_contents.push(try!(io::File::open(file).read_to_string()));
    }
 
    println!("\n   into:\n      {}\n", into_tag_file.display());
 
-   let mut merged_lines: Vec<&str> = Vec::with_capacity(100_000);
-   for content in file_contents.iter() {
-      for line in content.as_slice().lines_any() {
-         if ! line.is_empty() && line.char_at(0) != '!' {
-            merged_lines.push(line);
+   match *tags_kind {
+      TagsKind::Vi => {
+         let mut file_contents: Vec<String> = Vec::new();
+         for file in tag_files.iter() {
+            file_contents.push(try!(io::File::open(file).read_to_string()));
          }
+
+         let mut merged_lines: Vec<&str> = Vec::with_capacity(100_000);
+         for content in file_contents.iter() {
+            for line in content.as_slice().lines_any() {
+               if ! line.is_empty() && line.char_at(0) != '!' {
+                  merged_lines.push(line);
+               }
+            }
+         }
+
+         merged_lines.sort();
+         merged_lines.dedup();
+
+         let mut tag_file = try!(io::File::open_mode(into_tag_file, io::Truncate, io::ReadWrite));
+         try!(tag_file.write_line("!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;\" to lines/"));
+         try!(tag_file.write_line("!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/"));
+
+         for line in merged_lines.iter() {
+            try!(tag_file.write_line(*line));
+         }
+      },
+
+      TagsKind::Emacs => {
       }
-   }
-
-   merged_lines.sort();
-   merged_lines.dedup();
-
-   let mut tag_file = try!(io::File::open_mode(into_tag_file, io::Truncate, io::ReadWrite));
-   try!(tag_file.write_line("!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;\" to lines/"));
-   try!(tag_file.write_line("!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/"));
-
-   for line in merged_lines.iter() {
-      try!(tag_file.write_line(*line));
    }
 
    Ok(())

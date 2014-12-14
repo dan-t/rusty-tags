@@ -94,7 +94,7 @@ fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
       let mut tags_file = tag_dir.unwrap();
       tags_file.push(tags_kind.tags_file_name());
 
-      try!(merge_tags(&tag_files, &tags_file));
+      try!(merge_tags(tags_kind, &tag_files, &tags_file));
    }
 
    Ok(())
