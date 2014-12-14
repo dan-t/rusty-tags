@@ -27,11 +27,31 @@ mod types;
 
 fn main() 
 {
-   update_all_tags(&TagsKind::Vi).unwrap_or_else(|err| {
-      let stderr = &mut io::stderr();
-      let _ = writeln!(stderr, "rusty-tags: {}", err);
-      os::set_exit_status(1);
-   });
+   let args = os::args();
+   let tags_kind =
+      if args.len() == 2 {
+         match args[1].as_slice() {
+            "vi"    => Some(TagsKind::Vi),
+            "emacs" => Some(TagsKind::Emacs),
+            _       => None
+         }
+      }
+      else {
+         None
+      };
+
+   if let Some(tkind) = tags_kind {
+      update_all_tags(&tkind).unwrap_or_else(|err| {
+         let stderr = &mut io::stderr();
+         let _ = writeln!(stderr, "rusty-tags: {}", err);
+         os::set_exit_status(1);
+      });
+   }
+   else {
+      println!("Usage:
+   rusty-tags vi
+   rusty-tags emacs");
+   }
 }
 
 fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>

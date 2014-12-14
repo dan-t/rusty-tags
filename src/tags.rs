@@ -111,6 +111,13 @@ pub fn merge_tags(tags_kind: &TagsKind, tag_files: &Vec<Path>, into_tag_file: &P
       },
 
       TagsKind::Emacs => {
+         let mut tag_file = try!(io::File::open_mode(into_tag_file, io::Append, io::ReadWrite));
+
+         for file in tag_files.iter() {
+            if file != into_tag_file {
+               try!(tag_file.write_line(format!("{},include", file.display()).as_slice()));
+            }
+         }
       }
    }
 
