@@ -26,6 +26,7 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
    let mut tags_roots: TagsRoots = Vec::new();
    let deps_string = "dependencies".to_string();
    if ! toml_table.contains_key(&deps_string) {
+      tags_roots.push(TagsRoot::Src { src_dir: cargo_toml_dir.clone(), dependencies: Vec::new() });
       return Ok(tags_roots);
    }
 
