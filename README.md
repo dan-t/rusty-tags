@@ -46,29 +46,33 @@ and for crates.io dependencies inside of `~/.cargo/registry/src/github.com-*`.
 Rust Standard Library Support
 =============================
 
-`rusty-tags` can automatically add tags for the standard library to
-every tags file it's creating.
+The source code of Rust already contains a script for creating tags, but
+if you only want to jump into the standard library than reducing the directories
+gives better results.
 
-Creating tags for the standard library:
+First get the Rust source code:
 
     $ git clone https://github.com/rust-lang/rust.git
     $ cd rust
-    $ ./configure
-    $ make TAGS.vi
 
-You might want to modify `rust/mk/ctags.mk` to only consider rust files,
-otherwise you're also getting tags for all of rustcs c code:
+And now execute the following script inside of the rust directory:
 
-    -CTAGS_OPTS=--options="${CFG_SRC_DIR}src/etc/ctags.rust" --languages=-javascript --recurse ${CTAGS_LOCATIONS}
-    +CTAGS_OPTS=--options="${CFG_SRC_DIR}src/etc/ctags.rust" --languages=Rust --recurse ${CTAGS_LOCATIONS}
+    #!/usr/bin/env bash
+    
+    src_dirs=`ls -d $PWD/src/{liballoc,libarena,libbacktrace,libcollections,libcore,libflate,libfmt_macros,libgetopts,libgraphviz,liblog,librand,librbml,libregex,libregex_macros,libserialize,libstd,libsyntax,libterm,libtime,libunicode}`
+    
+    ctags -f rusty-tags.vi --options=src/etc/ctags.rust --languages=Rust --recurse $src_dirs
+    
+    ctags -e -f rusty-tags.emacs --options=src/etc/ctags.rust --languages=Rust --recurse $src_dirs
 
-Renaming the tags file, that if you've jumped to the standard
-library, that you're able to jump further inside of it, and copying a
-version of the tags, that `rusty-tags` can add it to every tags file it creates: 
+You can now add this tags file manually to your list of tags files in your editor settings
+or you can copy the `rusty-tags.vi` and `rusty-tags.emacs` files to `~/.rusty-tags/rust-std-lib.vi`
+respectively `~/.rusty-tags/rust-std-lib.emacs`. Then `rusty-tags` will automatically add
+the standard library tags file to every tags file it creates.
 
-    $ mv TAGS.vi rusty-tags.vi
-    $ mkdir -p ~/.rusty-tags
-    $ cp rusty-tags.vi ~/.rusty-tags/rust-std-lib.vi
+The automatic adding might be a bit annoying if you reguarly update the rust compiler
+and if the standard library changes. So adding the tags file manually might be the
+better option and also speeds up the creation of the tags.
 
 Vim Configuration
 =================
@@ -76,6 +80,11 @@ Vim Configuration
 Put this into your `~/.vim/after/ftplugin/rust.vim` file:
 
     set tags=rusty-tags.vi;/
+    autocmd BufWrite *.rs :silent !rusty-tags vi
+
+or, if you want to manually add the tags for the rust standard library:
+
+    set tags=rusty-tags.vi;/,path-to-rust-source-code/rusty-tags.vi
     autocmd BufWrite *.rs :silent !rusty-tags vi
 
 The first line (only supported by vim >= 7.4) ensures that vim will
