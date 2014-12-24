@@ -9,7 +9,7 @@ use types::{
    SourceKind
 };
 
-/// Reads the dependecies from the `Cargo.toml` located in `cargo_toml_dir`
+/// Reads the dependencies from the `Cargo.toml` located in `cargo_toml_dir`
 pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
 {
    let mut cargo_toml = cargo_toml_dir.clone();
