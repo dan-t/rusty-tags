@@ -1,3 +1,5 @@
+#![allow(unused_assignments)]
+
 extern crate toml;
 extern crate glob;
 
