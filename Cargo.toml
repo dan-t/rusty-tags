@@ -1,10 +1,12 @@
 [package]
 
 name = "rusty-tags"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["Daniel Trstenjak <daniel.trstenjak@gmail.com>"]
 license = "BSD-3-Clause"
 description = "Create tags for a cargo project and all of its dependencies"
+repository = "https://github.com/dan-t/rusty-tags"
+readme = "README.md"
 
 [dependencies]
 glob = "~0.1.3"
