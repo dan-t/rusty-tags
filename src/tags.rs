@@ -247,7 +247,7 @@ fn find_reexported_crates(src_dir: &Path) -> AppResult<Vec<CrateName>>
    let mut extern_crates = HashSet::<ExternCrate>::new();
 
    for line in lines {
-      let items = line.trim_chars(';').split(' ').collect::<Vec<&str>>();
+      let items = line.trim_matches(';').split(' ').collect::<Vec<&str>>();
       if items.len() < 3 {
          continue;
       }
@@ -261,10 +261,10 @@ fn find_reexported_crates(src_dir: &Path) -> AppResult<Vec<CrateName>>
 
       if items[0] == "extern" && items[1] == "crate" {
          if items.len() == 3 {
-            extern_crates.insert(ExternCrate { name: items[2].trim_chars('"'), as_name: items[2] });
+            extern_crates.insert(ExternCrate { name: items[2].trim_matches('"'), as_name: items[2] });
          }
          else if items.len() == 5 && items[3] == "as" {
-            extern_crates.insert(ExternCrate { name: items[2].trim_chars('"'), as_name: items[4] });
+            extern_crates.insert(ExternCrate { name: items[2].trim_matches('"'), as_name: items[4] });
          }
       }
    }
