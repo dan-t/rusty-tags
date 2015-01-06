@@ -1,4 +1,5 @@
 #![allow(unused_assignments)]
+#![feature(slicing_syntax)]
 
 extern crate toml;
 extern crate glob;

@@ -68,11 +68,14 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
       let mut dep_src_kinds: Vec<SourceKind> = Vec::new();
       for dep_name in dep_names.iter() {
          let dep_package = try!(find_package(&packages, *dep_name));
-         dep_src_kinds.push(try!(get_source_kind(dep_package, *dep_name)));
+         if let Ok(src_kind) = get_source_kind(dep_package, *dep_name) {
+            dep_src_kinds.push(src_kind);
+         }
       }
 
-      let src_kind = try!(get_source_kind(*package, lib_name));
-      tags_roots.push(TagsRoot::Lib { src_kind: src_kind, dependencies: dep_src_kinds });
+      if let Ok(src_kind) = get_source_kind(*package, lib_name) {
+         tags_roots.push(TagsRoot::Lib { src_kind: src_kind, dependencies: dep_src_kinds });
+      }
    }
 
    let mut lib_src_kinds: Vec<SourceKind> = Vec::new();
@@ -80,7 +83,9 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
       match *value {
          toml::Value::String(_) | toml::Value::Table(_) => {
             let lib_package = try!(find_package(&packages, lib_name[]));
-            lib_src_kinds.push(try!(get_source_kind(lib_package, lib_name[])));
+            if let Ok(src_kind) = get_source_kind(lib_package, lib_name[]) {
+               lib_src_kinds.push(src_kind);
+            }
          }
 
          _ => {
