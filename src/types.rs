@@ -25,11 +25,11 @@ impl Show for TagsRoot
    {
       match *self {
          TagsRoot::Src { ref src_dir, ref dependencies } => {
-            write!(f, "Src ( src_dir: {}, dependencies: {} )", src_dir.display(), dependencies)
+            write!(f, "Src ( src_dir: {}, dependencies: {:?} )", src_dir.display(), dependencies)
          },
 
          TagsRoot::Lib { ref src_kind, ref dependencies } => {
-            write!(f, "Lib ( src_kind: {}, dependencies: {} )", src_kind, dependencies)
+            write!(f, "Lib ( src_kind: {:?}, dependencies: {:?} )", src_kind, dependencies)
          }
       }
    }

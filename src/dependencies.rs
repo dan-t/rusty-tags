@@ -20,7 +20,7 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
 
    let toml_table = try!(
       toml_parser.parse()
-         .ok_or_else(|| app_err(format!("Couldn't parse '{}': {}", cargo_toml.display(), toml_parser.errors)))
+         .ok_or_else(|| app_err(format!("Couldn't parse '{}': {:?}", cargo_toml.display(), toml_parser.errors)))
    );
 
    let mut tags_roots: TagsRoots = Vec::new();
@@ -43,7 +43,7 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
 
    let lock_table = try!(
       lock_parser.parse()
-         .ok_or_else(|| app_err(format!("Couldn't parse '{}': {}", cargo_lock.display(), lock_parser.errors)))
+         .ok_or_else(|| app_err(format!("Couldn't parse '{}': {:?}", cargo_lock.display(), lock_parser.errors)))
    );
 
    let packages: Vec<&toml::Table> = try!(
@@ -61,7 +61,7 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
       let lib_name = try!(
          package.get("name")
             .and_then(toml::Value::as_str)
-            .ok_or_else(|| app_err(format!("Couldn't find name string in package: '{}'!", package)))
+            .ok_or_else(|| app_err(format!("Couldn't find name string in package: '{:?}'!", package)))
       );
 
       let dep_names = try!(get_dependencies(*package));
@@ -82,8 +82,8 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
    for (lib_name, value) in deps_table.iter() {
       match *value {
          toml::Value::String(_) | toml::Value::Table(_) => {
-            let lib_package = try!(find_package(&packages, lib_name[]));
-            if let Ok(src_kind) = get_source_kind(lib_package, lib_name[]) {
+            let lib_package = try!(find_package(&packages, &lib_name[]));
+            if let Ok(src_kind) = get_source_kind(lib_package, &lib_name[]) {
                lib_src_kinds.push(src_kind);
             }
          }
@@ -106,7 +106,7 @@ fn get_source_kind(lib_package: &toml::Table, lib_name: &str) -> AppResult<Sourc
    let source = try!(
       lib_package.get("source")
          .and_then(toml::Value::as_str)
-         .ok_or_else(|| app_err(format!("Couldn't find source string in package: '{}'!", lib_package)))
+         .ok_or_else(|| app_err(format!("Couldn't find source string in package: '{:?}'!", lib_package)))
    );
 
    let src_type = try!(
@@ -118,7 +118,7 @@ fn get_source_kind(lib_package: &toml::Table, lib_name: &str) -> AppResult<Sourc
    let version = try!(
       lib_package.get("version")
          .and_then(toml::Value::as_str)
-         .ok_or_else(|| app_err(format!("Couldn't find version string in package: '{}'!", lib_package)))
+         .ok_or_else(|| app_err(format!("Couldn't find version string in package: '{:?}'!", lib_package)))
    );
 
    match src_type {
@@ -137,7 +137,7 @@ fn get_source_kind(lib_package: &toml::Table, lib_name: &str) -> AppResult<Sourc
       }
 
       _ => {
-         Err(app_err(format!("Unexpected source type '{}' in package: '{}'!", src_type, lib_package)))
+         Err(app_err(format!("Unexpected source type '{}' in package: '{:?}'!", src_type, lib_package)))
       }
    }
 }
@@ -158,7 +158,7 @@ fn get_dependencies(lib_package: &toml::Table) -> AppResult<Vec<&str>>
              .filter_map(toml::Value::as_str)
              .collect()
          })
-         .ok_or_else(|| app_err(format!("Couldn't get Array of Strings for 'dependencies' entry: '{}'!", lib_package)))
+         .ok_or_else(|| app_err(format!("Couldn't get Array of Strings for 'dependencies' entry: '{:?}'!", lib_package)))
    );
 
    for dep_str in dep_strs.iter() {

@@ -46,7 +46,7 @@ fn main()
    if let Some(tkind) = tags_kind {
       update_all_tags(&tkind).unwrap_or_else(|err| {
          let stderr = &mut io::stderr();
-         let _ = writeln!(stderr, "rusty-tags: {}", err);
+         let _ = writeln!(stderr, "rusty-tags: {:?}", err);
          os::set_exit_status(1);
       });
    }

@@ -237,7 +237,7 @@ fn find_reexported_crates(src_dir: &Path) -> AppResult<Vec<CrateName>>
    type ModuleName = String;
    let mut pub_uses = HashSet::<ModuleName>::new();
 
-   #[deriving(Eq, PartialEq, Hash)]
+   #[derive(Eq, PartialEq, Hash)]
    struct ExternCrate<'a>
    {
       name: &'a str,
