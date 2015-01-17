@@ -9,7 +9,7 @@ use std::io::fs;
 use std::io;
 use std::os;
 
-use app_result::{AppResult, app_err};
+use app_result::{AppResult, AppErr, app_err};
 use dependencies::read_dependencies;
 use types::{TagsRoot, TagsKind};
 
@@ -45,8 +45,7 @@ fn main()
 
    if let Some(tkind) = tags_kind {
       update_all_tags(&tkind).unwrap_or_else(|err| {
-         let stderr = &mut io::stderr();
-         let _ = writeln!(stderr, "rusty-tags: {:?}", err);
+         write_to_stderr(&err);
          os::set_exit_status(1);
       });
    }
@@ -77,22 +76,39 @@ fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
             tag_files.push(src_tags);
 
             for dep in dependencies.iter() {
-               tag_files.push(try!(update_tags(tags_kind, dep)).tags_file);
+               match update_tags(tags_kind, dep) {
+                  Ok(tags) => tag_files.push(tags.tags_file),
+                  Err(err) => write_to_stderr(&err)
+               }
             }
 
             tag_dir = Some(src_dir.clone());
          },
 
          TagsRoot::Lib { ref src_kind, ref dependencies } => {
-            let lib_tags = try!(update_tags_and_check_for_reexports(tags_kind, src_kind, dependencies));
-            if lib_tags.is_up_to_date(tags_kind) {
-               continue;
-            }
+            let lib_tags = match update_tags_and_check_for_reexports(tags_kind, src_kind, dependencies) {
+               Ok(tags) => {
+                 if tags.is_up_to_date(tags_kind) {
+                    continue;
+                 }
+                 else {
+                    tags
+                 }
+               }
+
+               Err(err) => {
+                   write_to_stderr(&err);
+                   continue;
+               }
+            };
 
             tag_files.push(lib_tags.tags_file);
 
             for dep in dependencies.iter() {
-               tag_files.push(try!(update_tags(tags_kind, dep)).tags_file);
+               match update_tags(tags_kind, dep) {
+                  Ok(tags) => tag_files.push(tags.tags_file),
+                  Err(err) => write_to_stderr(&err)
+               }
             }
 
             tag_dir = Some(lib_tags.src_dir.clone());
@@ -146,4 +162,10 @@ fn rust_std_lib_tags_file(tags_kind: &TagsKind) -> AppResult<Path>
    tags_file.push(format!("rust-std-lib.{}", tags_kind.tags_file_extension()));
 
    Ok(tags_file)
+}
+
+fn write_to_stderr(err: &AppErr)
+{
+   let stderr = &mut io::stderr();
+   let _ = writeln!(stderr, "rusty-tags: {:?}", err);
 }
