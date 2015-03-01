@@ -1,12 +1,13 @@
-use std::io::fs::PathExtensions;
+use std::fs::PathExt;
 use std::fmt::{Show, Formatter, Error};
+use std::path::{PathBuf, AsPath};
 
 pub enum TagsRoot
 {
    /// the source directory and the dependencies
    /// of the cargo project
    Src {
-      src_dir: Path,
+      src_dir: PathBuf,
       dependencies: Vec<SourceKind>
    },
 
@@ -99,10 +100,10 @@ pub struct Tags
 {
    /// the root directory of the source code
    /// for which the tags have been created
-   pub src_dir: Path,
+   pub src_dir: PathBuf,
 
    /// the tags file of the sources in `src_dir`
-   pub tags_file: Path,
+   pub tags_file: PathBuf,
 
    /// indicates if the tags file is already existing
    /// and the cached tags file is returned
@@ -111,7 +112,7 @@ pub struct Tags
 
 impl Tags
 {
-   pub fn new(src_dir: &Path, tags_file: &Path, cached: bool) -> Tags
+   pub fn new(src_dir: &PathBuf, tags_file: &PathBuf, cached: bool) -> Tags
    {
       Tags { src_dir: src_dir.clone(), tags_file: tags_file.clone(), cached: cached }
    }
@@ -125,7 +126,7 @@ impl Tags
       let mut src_tags = self.src_dir.clone();
       src_tags.push(tags_kind.tags_file_name());
 
-      src_tags.is_file()
+      src_tags.as_path().is_file()
    }
 }
 
@@ -139,7 +140,7 @@ impl Show for Tags
 }
 
 /// which kind of tags are created
-#[deriving(Eq, PartialEq, Show)]
+#[derive(Eq, PartialEq, Debug)]
 pub enum TagsKind
 {
    Vi,

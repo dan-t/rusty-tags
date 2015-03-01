@@ -1,13 +1,13 @@
-use std::io::fs;
-use std::io::fs::PathExtensions;
+use std::fs::{self, PathExt};
 use std::io;
 use std::os;
+use std::path::PathBuf;
 use glob::{glob, Paths};
 
 use app_result::{AppResult, app_err};
 
 /// where `rusty-tags` caches its tag files
-pub fn rusty_tags_cache_dir() -> AppResult<Path>
+pub fn rusty_tags_cache_dir() -> AppResult<PathBuf>
 {
    let dir = try!(
       rusty_tags_dir().map(|mut d| {
@@ -17,14 +17,14 @@ pub fn rusty_tags_cache_dir() -> AppResult<Path>
    );
 
    if ! dir.is_dir() {
-      try!(fs::mkdir_recursive(&dir, io::USER_RWX));
+      try!(fs::create_dir_all(&dir));
    }
 
    Ok(dir)
 }
 
 /// where rusty-tags puts all of its stuff
-pub fn rusty_tags_dir() -> AppResult<Path>
+pub fn rusty_tags_dir() -> AppResult<PathBuf>
 {
    let dir = try!(
       homedir().map(|mut d| {
@@ -34,14 +34,14 @@ pub fn rusty_tags_dir() -> AppResult<Path>
    );
 
    if ! dir.is_dir() {
-      try!(fs::mkdir_recursive(&dir, io::USER_RWX));
+      try!(fs::create_dir_all(&dir));
    }
 
    Ok(dir)
 }
 
 /// where cargo puts its git checkouts
-pub fn cargo_git_src_dir() -> AppResult<Path>
+pub fn cargo_git_src_dir() -> AppResult<PathBuf>
 {
    cargo_dir().map(|mut d| {
       d.push("git");
@@ -51,7 +51,7 @@ pub fn cargo_git_src_dir() -> AppResult<Path>
 }
 
 /// where cargo puts the source code of crates.io
-pub fn cargo_crates_io_src_dir() -> AppResult<Path>
+pub fn cargo_crates_io_src_dir() -> AppResult<PathBuf>
 {
    let src_dir = try!(
       cargo_dir().map(|mut d| {
@@ -62,27 +62,33 @@ pub fn cargo_crates_io_src_dir() -> AppResult<Path>
       })
    );
 
-   let paths = glob_path(&src_dir);
-   if paths.count() != 1 {
-      return Err(app_err(format!("Expected one matching path for '{}'!", src_dir.display())));
+   let src_str = format!("{}", src_dir.display());
+   let mut paths = try!(glob_path(&src_str));
+   if let Some(Ok(path)) = paths.nth(0) {
+      Ok(PathBuf::new(&format!("{}", path.display())))
    }
-
-   let mut paths = glob_path(&src_dir);
-   Ok(paths.nth(0).unwrap())
+   else {
+      Err(app_err(format!("Expected one matching path for '{}'!", src_str)))
+   }
 }
 
 /// where cargo puts all of its stuff
-fn cargo_dir() -> AppResult<Path>
+fn cargo_dir() -> AppResult<PathBuf>
 {
    homedir().map(|mut d| { d.push(".cargo"); d })
 }
 
-pub fn glob_path(pattern: &Path) -> Paths
+pub fn glob_path(pattern: &String) -> AppResult<Paths>
 {
-   glob(pattern.as_str().unwrap())
+   Ok(try!(glob(&pattern)))
 }
 
-fn homedir() -> AppResult<Path>
+fn homedir() -> AppResult<PathBuf>
 {
-   os::homedir().ok_or(app_err("Couldn't read home directory!".to_string()))
+   if let Some(path) = os::homedir() {
+      Ok(PathBuf::new(&format!("{}", path.display())))
+   }
+   else {
+      Err(app_err("Couldn't read home directory!".to_string()))
+   }
 }

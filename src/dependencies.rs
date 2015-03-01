@@ -1,4 +1,6 @@
-use std::io;
+use std::fs::File;
+use std::io::Read;
+use std::path::AsPath;
 use toml;
 
 use app_result::{AppResult, app_err};
@@ -10,22 +12,17 @@ use types::{
 };
 
 /// Reads the dependencies from the `Cargo.toml` located in `cargo_toml_dir`
-pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
+pub fn read_dependencies<P: AsPath>(cargo_toml_dir: &P) -> AppResult<TagsRoots>
 {
-   let mut cargo_toml = cargo_toml_dir.clone();
-   cargo_toml.push("Cargo.toml");
-
-   let toml_string = try!(io::File::open(&cargo_toml).read_to_string());
-   let mut toml_parser = toml::Parser::new(&*toml_string);
-
-   let toml_table = try!(
-      toml_parser.parse()
-         .ok_or_else(|| app_err(format!("Couldn't parse '{}': {:?}", cargo_toml.display(), toml_parser.errors)))
-   );
+   let toml_table = {
+      let mut cargo_toml = cargo_toml_dir.as_path().to_path_buf();
+      cargo_toml.push("Cargo.toml");
+      try!(parse_toml(&cargo_toml))
+   };
 
    let mut tags_roots: TagsRoots = Vec::new();
    if ! toml_table.contains_key("dependencies") {
-      tags_roots.push(TagsRoot::Src { src_dir: cargo_toml_dir.clone(), dependencies: Vec::new() });
+      tags_roots.push(TagsRoot::Src { src_dir: cargo_toml_dir.as_path().to_path_buf(), dependencies: Vec::new() });
       return Ok(tags_roots);
    }
 
@@ -35,16 +32,11 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
          .ok_or(app_err(format!("Couldn't get toml::Table entry for 'dependency'!")))
    );
 
-   let mut cargo_lock = cargo_toml_dir.clone();
-   cargo_lock.push("Cargo.lock");
-
-   let lock_string = try!(io::File::open(&cargo_lock).read_to_string());
-   let mut lock_parser = toml::Parser::new(&*lock_string);
-
-   let lock_table = try!(
-      lock_parser.parse()
-         .ok_or_else(|| app_err(format!("Couldn't parse '{}': {:?}", cargo_lock.display(), lock_parser.errors)))
-   );
+   let lock_table = {
+      let mut cargo_lock = cargo_toml_dir.as_path().to_path_buf();
+      cargo_lock.push("Cargo.lock");
+      try!(parse_toml(&cargo_lock))
+   };
 
    let packages: Vec<&toml::Table> = try!(
       lock_table.get("package")
@@ -82,8 +74,8 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
    for (lib_name, value) in deps_table.iter() {
       match *value {
          toml::Value::String(_) | toml::Value::Table(_) => {
-            let lib_package = try!(find_package(&packages, &lib_name[]));
-            if let Ok(src_kind) = get_source_kind(lib_package, &lib_name[]) {
+            let lib_package = try!(find_package(&packages, &lib_name));
+            if let Ok(src_kind) = get_source_kind(lib_package, &lib_name) {
                lib_src_kinds.push(src_kind);
             }
          }
@@ -96,7 +88,7 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
       }
    }
 
-   tags_roots.push(TagsRoot::Src { src_dir: cargo_toml_dir.clone(), dependencies: lib_src_kinds });
+   tags_roots.push(TagsRoot::Src { src_dir: cargo_toml_dir.as_path().to_path_buf(), dependencies: lib_src_kinds });
 
    Ok(tags_roots)
 }
@@ -183,4 +175,13 @@ fn find_package<'a>(packages: &'a Vec<&toml::Table>, lib_name: &str) -> AppResul
    );
 
    Ok(*package)
+}
+
+fn parse_toml<P: AsPath>(path: &P) -> AppResult<toml::Table>
+{
+   let mut file = try!(File::open(path));
+   let mut string = String::new();
+   try!(file.read_to_string(&mut string));
+   let mut parser = toml::Parser::new(&string);
+   parser.parse().ok_or_else(|| app_err(format!("Couldn't parse '{}': {:?}", path.as_path().display(), parser.errors)))
 }

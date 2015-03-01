@@ -3,11 +3,11 @@
 
 extern crate toml;
 extern crate glob;
+extern crate term;
 
-use std::io::fs::PathExtensions;
-use std::io::fs;
-use std::io;
+use std::fs::{self, PathExt};
 use std::os;
+use std::path::{PathBuf, AsPath};
 
 use app_result::{AppResult, AppErr, app_err};
 use dependencies::read_dependencies;
@@ -65,8 +65,8 @@ fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
    let rust_std_lib_tags_file = try!(rust_std_lib_tags_file(tags_kind));
 
    for tags_root in tags_roots.iter() {
-      let mut tag_files: Vec<Path> = Vec::new();
-      let mut tag_dir: Option<Path> = None;
+      let mut tag_files: Vec<PathBuf> = Vec::new();
+      let mut tag_dir: Option<PathBuf> = None;
 
       match *tags_root {
          TagsRoot::Src { ref src_dir, ref dependencies } => {
@@ -119,7 +119,7 @@ fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
          continue;
       }
 
-      if rust_std_lib_tags_file.is_file() {
+      if rust_std_lib_tags_file.as_path().is_file() {
          tag_files.push(rust_std_lib_tags_file.clone());
       }
 
@@ -135,37 +135,40 @@ fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
 /// Searches for a directory containing a `Cargo.toml` file starting at
 /// `start_dir` and continuing the search upwards the directory tree
 /// until a directory is found.
-fn find_cargo_toml_dir(start_dir: &Path) -> AppResult<Path>
+fn find_cargo_toml_dir<P: AsPath>(start_dir: &P) -> AppResult<PathBuf>
 {
-   let mut dir = start_dir.clone();
+   let mut dir = start_dir.as_path().to_path_buf();
    loop {
-      if let Ok(files) = fs::readdir(&dir) {
-         for file in files.iter() {
-            if file.is_file() {
-               if let Some("Cargo.toml") = file.filename_str() {
-                  return Ok(dir);
+      if let Ok(files) = fs::read_dir(&dir) {
+         for file in files {
+            if let Ok(file) = file {
+               if file.path().is_file() {
+                  if let Some("Cargo.toml") = file.path().file_name().and_then(|s| s.to_str()) {
+                     return Ok(dir);
+                  }
                }
             }
          }
       }
 
       if ! dir.pop() {
-         return Err(app_err(format!("Couldn't find 'Cargo.toml' starting at directory '{}'!", start_dir.display())));
+         return Err(app_err(format!("Couldn't find 'Cargo.toml' starting at directory '{}'!", start_dir.as_path().display())));
       }
    }
 }
 
 /// the tags file containing the tags for the rust standard library
-fn rust_std_lib_tags_file(tags_kind: &TagsKind) -> AppResult<Path>
+fn rust_std_lib_tags_file(tags_kind: &TagsKind) -> AppResult<PathBuf>
 {
    let mut tags_file = try!(rusty_tags_dir());
-   tags_file.push(format!("rust-std-lib.{}", tags_kind.tags_file_extension()));
+   tags_file.push(&format!("rust-std-lib.{}", tags_kind.tags_file_extension()));
 
    Ok(tags_file)
 }
 
 fn write_to_stderr(err: &AppErr)
 {
-   let stderr = &mut io::stderr();
-   let _ = writeln!(stderr, "rusty-tags: {:?}", err);
+   if let Some(mut stderr) = term::stderr() {
+      let _ = writeln!(&mut stderr, "rusty-tags: {}", err);
+   }
 }
