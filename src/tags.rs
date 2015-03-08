@@ -1,4 +1,4 @@
-use std::fs::{self, File, OpenOptions, PathExt};
+use std::fs::{File, OpenOptions, PathExt};
 use std::io::{Read, Write};
 use std::process::Command;
 use std::collections::HashSet;
@@ -187,7 +187,7 @@ fn find_src_dir(source: &SourceKind) -> AppResult<PathBuf>
          src_dir.push(&lib_src);
          src_dir.push("master");
 
-         let mut src_paths = try!(glob_path(&format!("{}", src_dir.display())));
+         let src_paths = try!(glob_path(&format!("{}", src_dir.display())));
          for src_path in src_paths {
             if let Ok(path) = src_path {
                let src_path_buf = PathBuf::new(&format!("{}", path.display()));
@@ -205,7 +205,7 @@ fn find_src_dir(source: &SourceKind) -> AppResult<PathBuf>
          src_dir.push("*");
          src_dir.push("master");
 
-         let mut src_paths = try!(glob_path(&format!("{}", src_dir.display())));
+         let src_paths = try!(glob_path(&format!("{}", src_dir.display())));
          for src_path in src_paths {
             if let Ok(path) = src_path {
                let src_path_buf = PathBuf::new(&format!("{}", path.display()));

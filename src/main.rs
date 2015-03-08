@@ -1,12 +1,12 @@
 #![allow(unused_assignments)]
-#![feature(slicing_syntax)]
+#![feature(os, io, old_io, fs, path, core, process, collections, env)]
 
 extern crate toml;
 extern crate glob;
 extern crate term;
 
 use std::fs::{self, PathExt};
-use std::os;
+use std::env;
 use std::path::{PathBuf, AsPath};
 
 use app_result::{AppResult, AppErr, app_err};
@@ -30,14 +30,16 @@ mod types;
 
 fn main() 
 {
-   let args = os::args();
+   let mut args = env::args();
    let tags_kind =
       if args.len() == 2 {
-         match args[1].as_slice() {
-            "vi"    => Some(TagsKind::Vi),
-            "emacs" => Some(TagsKind::Emacs),
-            _       => None
-         }
+         args.nth(1).and_then(|arg| {
+            match arg.as_slice() {
+               "vi"    => Some(TagsKind::Vi),
+               "emacs" => Some(TagsKind::Emacs),
+               _       => None
+            }
+         })
       }
       else {
          None
@@ -46,7 +48,7 @@ fn main()
    if let Some(tkind) = tags_kind {
       update_all_tags(&tkind).unwrap_or_else(|err| {
          write_to_stderr(&err);
-         os::set_exit_status(1);
+         env::set_exit_status(1);
       });
    }
    else {
@@ -58,7 +60,7 @@ fn main()
 
 fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
 {
-   let cwd = try!(os::getcwd());
+   let cwd = try!(env::current_dir());
    let cargo_dir = try!(find_cargo_toml_dir(&cwd));
    let tags_roots = try!(read_dependencies(&cargo_dir));
 

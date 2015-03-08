@@ -1,6 +1,5 @@
 use std::fs::{self, PathExt};
-use std::io;
-use std::os;
+use std::env;
 use std::path::PathBuf;
 use glob::{glob, Paths};
 
@@ -85,7 +84,7 @@ pub fn glob_path(pattern: &String) -> AppResult<Paths>
 
 fn homedir() -> AppResult<PathBuf>
 {
-   if let Some(path) = os::homedir() {
+   if let Some(path) = env::home_dir() {
       Ok(PathBuf::new(&format!("{}", path.display())))
    }
    else {

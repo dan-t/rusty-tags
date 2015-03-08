@@ -1,5 +1,5 @@
 use std::fs::PathExt;
-use std::fmt::{Show, Formatter, Error};
+use std::fmt::{Debug, Formatter, Error};
 use std::path::{PathBuf, AsPath};
 
 pub enum TagsRoot
@@ -20,7 +20,7 @@ pub enum TagsRoot
 
 pub type TagsRoots = Vec<TagsRoot>;
 
-impl Show for TagsRoot
+impl Debug for TagsRoot
 {
    fn fmt(&self, f: &mut Formatter) -> Result<(), Error>
    {
@@ -80,7 +80,7 @@ impl SourceKind
    }
 }
 
-impl Show for SourceKind
+impl Debug for SourceKind
 {
    fn fmt(&self, f: &mut Formatter) -> Result<(), Error>
    {
@@ -130,7 +130,7 @@ impl Tags
    }
 }
 
-impl Show for Tags
+impl Debug for Tags
 {
    fn fmt(&self, f: &mut Formatter) -> Result<(), Error>
    {
