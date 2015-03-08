@@ -282,7 +282,7 @@ fn find_reexported_crates<P: AsPath>(src_dir: &P) -> AppResult<Vec<CrateName>>
       }
 
       if items[0] == "pub" && items[1] == "use" {
-         let mods = items[2].split_str("::").collect::<Vec<&str>>();
+         let mods = items[2].split("::").collect::<Vec<&str>>();
          if mods.len() >= 1 {
             pub_uses.insert(mods[0].to_string());
          }

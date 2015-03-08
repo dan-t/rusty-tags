@@ -1,5 +1,5 @@
 #![allow(unused_assignments)]
-#![feature(os, io, old_io, fs, path, core, process, collections, env)]
+#![feature(io, old_io, path, core, collections, path_ext, exit_status)]
 
 extern crate toml;
 extern crate glob;
