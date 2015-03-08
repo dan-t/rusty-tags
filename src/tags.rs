@@ -107,6 +107,7 @@ pub fn merge_tags<P: AsPath>(tags_kind: &TagsKind, tag_files: &Vec<PathBuf>, int
 
          let mut tag_file = try!(
              OpenOptions::new()
+                .create(true)
                 .truncate(true)
                 .read(true)
                 .write(true)
@@ -124,6 +125,7 @@ pub fn merge_tags<P: AsPath>(tags_kind: &TagsKind, tag_files: &Vec<PathBuf>, int
       TagsKind::Emacs => {
          let mut tag_file = try!(
              OpenOptions::new()
+                .create(true)
                 .append(true)
                 .read(true)
                 .write(true)
