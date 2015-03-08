@@ -9,6 +9,6 @@ repository = "https://github.com/dan-t/rusty-tags"
 readme = "README.md"
 
 [dependencies]
-glob = "~0.1.6"
+glob = "~0.2.2"
 toml = "~0.1.12"
 term = "~0.1.13"
