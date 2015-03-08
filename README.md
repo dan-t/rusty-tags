@@ -39,9 +39,9 @@ to jump further to its dependencies.
 `rusty-tags` should also correctly handle the case if a dependency
 reexports parts of its own dependencies.
 
-Currently `rusty-tags` doesn't support cargo dependency overwrites and
-only searches for git dependencies inside of `~/.cargo/git/checkouts/`
-and for crates.io dependencies inside of `~/.cargo/registry/src/github.com-*`.
+Currently `rusty-tags` doesn't support local dependencies and dependency overwrites.
+For git dependencies it only searches inside of `~/.cargo/git/checkouts/` and for
+crates.io dependencies inside of `~/.cargo/registry/src/github.com-*`.
 
 Rust Standard Library Support
 =============================
@@ -59,7 +59,7 @@ And now execute the following script inside of the rust directory:
 
     #!/usr/bin/env bash
     
-    src_dirs=`ls -d $PWD/src/{liballoc,libarena,libbacktrace,libcollections,libcore,libflate,libfmt_macros,libgetopts,libgraphviz,liblog,librand,librbml,libregex,libregex_macros,libserialize,libstd,libsyntax,libterm,libtime,libunicode}`
+    src_dirs=`ls -d $PWD/src/{liballoc,libarena,libbacktrace,libcollections,libcore,libflate,libfmt_macros,libgetopts,libgraphviz,liblog,librand,librbml,libserialize,libstd,libsyntax,libterm,libunicode}`
     
     ctags -f rusty-tags.vi --options=src/etc/ctags.rust --languages=Rust --recurse $src_dirs
     
