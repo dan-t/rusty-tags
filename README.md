@@ -15,11 +15,11 @@ Installation
 ============
 
 * get `rustc` and `cargo` from [here](<http://www.rust-lang.org/install.html>)
-(Last successful build with: rustc 1.0.0-nightly (123a754cb 2015-03-24) (built 2015-03-25))
-
 * `git clone https://github.com/dan-t/rusty-tags.git`
 * `cd rusty-tags`
 * `cargo build --release`
+
+(Last successful build with: rustc 1.0.0-nightly (123a754cb 2015-03-24) (built 2015-03-25))
 
 The build binary will be located at `target/release/rusty-tags`.
 
