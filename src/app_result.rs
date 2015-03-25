@@ -1,5 +1,4 @@
 use std::io;
-use std::old_io;
 use std::error::FromError;
 use std::fmt::{self, Display, Formatter};
 use glob;
@@ -37,14 +36,6 @@ impl Display for AppErr
 impl FromError<io::Error> for AppErr
 {
    fn from_error(err: io::Error) -> AppErr
-   {
-      AppErr { error: format!("{}", err) }
-   }
-}
-
-impl FromError<old_io::IoError> for AppErr
-{
-   fn from_error(err: old_io::IoError) -> AppErr
    {
       AppErr { error: format!("{}", err) }
    }

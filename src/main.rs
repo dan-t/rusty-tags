@@ -1,5 +1,5 @@
 #![allow(unused_assignments)]
-#![feature(io, old_io, path, core, collections, path_ext, exit_status)]
+#![feature(core, path_ext, exit_status, std_misc, str_char, convert)]
 
 extern crate toml;
 extern crate glob;
@@ -7,7 +7,7 @@ extern crate term;
 
 use std::fs::{self, PathExt};
 use std::env;
-use std::path::{PathBuf, AsPath};
+use std::path::{PathBuf, Path, AsPath};
 
 use app_result::{AppResult, AppErr, app_err};
 use dependencies::read_dependencies;
@@ -34,7 +34,7 @@ fn main()
    let tags_kind =
       if args.len() == 2 {
          args.nth(1).and_then(|arg| {
-            match arg.as_slice() {
+            match arg.as_ref() {
                "vi"    => Some(TagsKind::Vi),
                "emacs" => Some(TagsKind::Emacs),
                _       => None
@@ -137,9 +137,9 @@ fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
 /// Searches for a directory containing a `Cargo.toml` file starting at
 /// `start_dir` and continuing the search upwards the directory tree
 /// until a directory is found.
-fn find_cargo_toml_dir<P: AsPath>(start_dir: &P) -> AppResult<PathBuf>
+fn find_cargo_toml_dir(start_dir: &Path) -> AppResult<PathBuf>
 {
-   let mut dir = start_dir.as_path().to_path_buf();
+   let mut dir = start_dir.to_path_buf();
    loop {
       if let Ok(files) = fs::read_dir(&dir) {
          for file in files {
@@ -154,7 +154,7 @@ fn find_cargo_toml_dir<P: AsPath>(start_dir: &P) -> AppResult<PathBuf>
       }
 
       if ! dir.pop() {
-         return Err(app_err(format!("Couldn't find 'Cargo.toml' starting at directory '{}'!", start_dir.as_path().display())));
+         return Err(app_err(format!("Couldn't find 'Cargo.toml' starting at directory '{}'!", start_dir.display())));
       }
    }
 }

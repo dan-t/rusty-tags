@@ -64,7 +64,7 @@ pub fn cargo_crates_io_src_dir() -> AppResult<PathBuf>
    let src_str = format!("{}", src_dir.display());
    let mut paths = try!(glob_path(&src_str));
    if let Some(Ok(path)) = paths.nth(0) {
-      Ok(PathBuf::new(&format!("{}", path.display())))
+      Ok(path)
    }
    else {
       Err(app_err(format!("Expected one matching path for '{}'!", src_str)))
@@ -85,7 +85,7 @@ pub fn glob_path(pattern: &String) -> AppResult<Paths>
 fn homedir() -> AppResult<PathBuf>
 {
    if let Some(path) = env::home_dir() {
-      Ok(PathBuf::new(&format!("{}", path.display())))
+      Ok(path)
    }
    else {
       Err(app_err("Couldn't read home directory!".to_string()))

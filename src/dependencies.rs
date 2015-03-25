@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::io::Read;
-use std::path::AsPath;
+use std::path::Path;
 use toml;
 
 use app_result::{AppResult, app_err};
@@ -12,17 +12,17 @@ use types::{
 };
 
 /// Reads the dependencies from the `Cargo.toml` located in `cargo_toml_dir`
-pub fn read_dependencies<P: AsPath>(cargo_toml_dir: &P) -> AppResult<TagsRoots>
+pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
 {
    let toml_table = {
-      let mut cargo_toml = cargo_toml_dir.as_path().to_path_buf();
+      let mut cargo_toml = cargo_toml_dir.to_path_buf();
       cargo_toml.push("Cargo.toml");
       try!(parse_toml(&cargo_toml))
    };
 
    let mut tags_roots: TagsRoots = Vec::new();
    if ! toml_table.contains_key("dependencies") {
-      tags_roots.push(TagsRoot::Src { src_dir: cargo_toml_dir.as_path().to_path_buf(), dependencies: Vec::new() });
+      tags_roots.push(TagsRoot::Src { src_dir: cargo_toml_dir.to_path_buf(), dependencies: Vec::new() });
       return Ok(tags_roots);
    }
 
@@ -33,7 +33,7 @@ pub fn read_dependencies<P: AsPath>(cargo_toml_dir: &P) -> AppResult<TagsRoots>
    );
 
    let lock_table = {
-      let mut cargo_lock = cargo_toml_dir.as_path().to_path_buf();
+      let mut cargo_lock = cargo_toml_dir.to_path_buf();
       cargo_lock.push("Cargo.lock");
       try!(parse_toml(&cargo_lock))
    };
@@ -88,7 +88,7 @@ pub fn read_dependencies<P: AsPath>(cargo_toml_dir: &P) -> AppResult<TagsRoots>
       }
    }
 
-   tags_roots.push(TagsRoot::Src { src_dir: cargo_toml_dir.as_path().to_path_buf(), dependencies: lib_src_kinds });
+   tags_roots.push(TagsRoot::Src { src_dir: cargo_toml_dir.to_path_buf(), dependencies: lib_src_kinds });
 
    Ok(tags_roots)
 }
@@ -177,11 +177,11 @@ fn find_package<'a>(packages: &'a Vec<&toml::Table>, lib_name: &str) -> AppResul
    Ok(*package)
 }
 
-fn parse_toml<P: AsPath>(path: &P) -> AppResult<toml::Table>
+fn parse_toml(path: &Path) -> AppResult<toml::Table>
 {
    let mut file = try!(File::open(path));
    let mut string = String::new();
    try!(file.read_to_string(&mut string));
    let mut parser = toml::Parser::new(&string);
-   parser.parse().ok_or_else(|| app_err(format!("Couldn't parse '{}': {:?}", path.as_path().display(), parser.errors)))
+   parser.parse().ok_or_else(|| app_err(format!("Couldn't parse '{}': {:?}", path.display(), parser.errors)))
 }

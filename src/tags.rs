@@ -2,7 +2,7 @@ use std::fs::{File, OpenOptions, PathExt};
 use std::io::{Read, Write};
 use std::process::Command;
 use std::collections::HashSet;
-use std::path::{PathBuf, AsPath};
+use std::path::{PathBuf, Path, AsPath};
 
 use app_result::{AppResult, app_err};
 use types::{Tags, TagsKind, SourceKind};
@@ -73,7 +73,7 @@ pub fn update_tags_and_check_for_reexports(tags_kind: &TagsKind,
 }
 
 /// merges `tag_files` into `into_tag_file`
-pub fn merge_tags<P: AsPath>(tags_kind: &TagsKind, tag_files: &Vec<PathBuf>, into_tag_file: &P) -> AppResult<()>
+pub fn merge_tags(tags_kind: &TagsKind, tag_files: &Vec<PathBuf>, into_tag_file: &Path) -> AppResult<()>
 {
    println!("Merging ...\n   tags:");
 
@@ -81,7 +81,7 @@ pub fn merge_tags<P: AsPath>(tags_kind: &TagsKind, tag_files: &Vec<PathBuf>, int
       println!("      {}", file.display());
    }
 
-   println!("\n   into:\n      {}\n", into_tag_file.as_path().display());
+   println!("\n   into:\n      {}\n", into_tag_file.display());
 
    match *tags_kind {
       TagsKind::Vi => {
@@ -95,7 +95,7 @@ pub fn merge_tags<P: AsPath>(tags_kind: &TagsKind, tag_files: &Vec<PathBuf>, int
 
          let mut merged_lines: Vec<&str> = Vec::with_capacity(100_000);
          for content in file_contents.iter() {
-            for line in content.as_slice().lines_any() {
+            for line in content.lines_any() {
                if ! line.is_empty() && line.char_at(0) != '!' {
                   merged_lines.push(line);
                }
@@ -133,7 +133,7 @@ pub fn merge_tags<P: AsPath>(tags_kind: &TagsKind, tag_files: &Vec<PathBuf>, int
          );
 
          for file in tag_files.iter() {
-            if file.as_path() != into_tag_file.as_path() {
+            if file.as_path() != into_tag_file {
                try!(tag_file.write_fmt(format_args!("{},include\n", file.display())));
             }
          }
@@ -145,7 +145,7 @@ pub fn merge_tags<P: AsPath>(tags_kind: &TagsKind, tag_files: &Vec<PathBuf>, int
 
 /// creates tags recursive for the directory hierarchy starting at `src_dir`
 /// and writes them to `tags_file`
-pub fn create_tags<P: AsPath>(tags_kind: &TagsKind, src_dir: &P, tags_file: &P) -> AppResult<()>
+pub fn create_tags(tags_kind: &TagsKind, src_dir: &Path, tags_file: &Path) -> AppResult<()>
 {
    let mut cmd = Command::new("ctags");
 
@@ -165,11 +165,11 @@ pub fn create_tags<P: AsPath>(tags_kind: &TagsKind, src_dir: &P, tags_file: &P) 
       .arg("--regex-Rust=/^[ \\t]*(pub[ \\t]+)?impl([ \\t\\n]*<[^>]*>)?[ \\t]+(([a-zA-Z0-9_:]+)[ \\t]*(<[^>]*>)?[ \\t]+(for)[ \\t]+)?([a-zA-Z0-9_]+)/\\4 \\6 \\7/i,impls,trait implementations/")
       .arg("--regex-Rust=/^[ \\t]*macro_rules![ \\t]+([a-zA-Z0-9_]+)/\\1/d,macros,macro definitions/")
       .arg("-o")
-      .arg(tags_file.as_path())
-      .arg(src_dir.as_path());
+      .arg(tags_file)
+      .arg(src_dir);
 
    println!("Creating tags ...\n   for source:\n      {}\n\n   cached at:\n      {}\n",
-            src_dir.as_path().display(), tags_file.as_path().display());
+            src_dir.display(), tags_file.display());
 
    try!(cmd.output());
    Ok(())
@@ -192,10 +192,9 @@ fn find_src_dir(source: &SourceKind) -> AppResult<PathBuf>
          let src_paths = try!(glob_path(&format!("{}", src_dir.display())));
          for src_path in src_paths {
             if let Ok(path) = src_path {
-               let src_path_buf = PathBuf::new(&format!("{}", path.display()));
-               let src_commit_hash = try!(get_commit_hash(&src_path_buf));
+               let src_commit_hash = try!(get_commit_hash(&path));
                if *commit_hash == src_commit_hash {
-                  return Ok(src_path_buf);
+                  return Ok(path);
                }
             }
          }
@@ -210,10 +209,9 @@ fn find_src_dir(source: &SourceKind) -> AppResult<PathBuf>
          let src_paths = try!(glob_path(&format!("{}", src_dir.display())));
          for src_path in src_paths {
             if let Ok(path) = src_path {
-               let src_path_buf = PathBuf::new(&format!("{}", path.display()));
-               let src_commit_hash = try!(get_commit_hash(&src_path_buf));
+               let src_commit_hash = try!(get_commit_hash(&path));
                if *commit_hash == src_commit_hash {
-                  return Ok(src_path_buf);
+                  return Ok(path);
                }
             }
          }
@@ -246,9 +244,9 @@ type CrateName = String;
 
 /// searches in the file `<src_dir>/src/lib.rs` for external crates
 /// that are reexpored and returns their names
-fn find_reexported_crates<P: AsPath>(src_dir: &P) -> AppResult<Vec<CrateName>>
+fn find_reexported_crates(src_dir: &Path) -> AppResult<Vec<CrateName>>
 {
-   let mut lib_file = src_dir.as_path().to_path_buf();
+   let mut lib_file = src_dir.to_path_buf();
    lib_file.push("src");
    lib_file.push("lib.rs");
 
@@ -311,7 +309,7 @@ fn find_reexported_crates<P: AsPath>(src_dir: &P) -> AppResult<Vec<CrateName>>
 }
 
 /// get the commit hash of the current `HEAD` of the git repository located at `git_dir`
-fn get_commit_hash<P: AsPath>(git_dir: &P) -> AppResult<String>
+fn get_commit_hash(git_dir: &Path) -> AppResult<String>
 {
    let mut cmd = Command::new("git");
    cmd.current_dir(git_dir)
@@ -320,6 +318,6 @@ fn get_commit_hash<P: AsPath>(git_dir: &P) -> AppResult<String>
 
    let out = try!(cmd.output());
    String::from_utf8(out.stdout)
-      .map(|s| s.as_slice().trim().to_string())
+      .map(|s| s.trim().to_string())
       .map_err(|_| app_err("Couldn't convert git output to utf8!".to_string()))
 }
