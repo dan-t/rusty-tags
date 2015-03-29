@@ -4,10 +4,12 @@
 extern crate toml;
 extern crate glob;
 extern crate term;
+extern crate clap;
 
 use std::fs::{self, PathExt};
 use std::env;
 use std::path::{PathBuf, Path, AsPath};
+use clap::{App, Arg};
 
 use app_result::{AppResult, AppErr, app_err};
 use dependencies::read_dependencies;
@@ -30,32 +32,35 @@ mod types;
 
 fn main() 
 {
-   let mut args = env::args();
-   let tags_kind =
-      if args.len() == 2 {
-         args.nth(1).and_then(|arg| {
-            match arg.as_ref() {
-               "vi"    => Some(TagsKind::Vi),
-               "emacs" => Some(TagsKind::Emacs),
-               _       => None
-            }
-         })
-      }
-      else {
-         None
-      };
+   // Pull version from Cargo.toml
+  let version = format!("{}.{}.{}{}",
+                          env!("CARGO_PKG_VERSION_MAJOR"),
+                          env!("CARGO_PKG_VERSION_MINOR"),
+                          env!("CARGO_PKG_VERSION_PATCH"),
+                          option_env!("CARGO_PKG_VERSION_PRE").unwrap_or("")); 
 
-   if let Some(tkind) = tags_kind {
-      update_all_tags(&tkind).unwrap_or_else(|err| {
+   // Create the application
+   let matches = App::new("rusty-tags")
+                  .about("Create ctags/etags for a cargo project and all of its dependencies")
+                  .version(&version[..])
+                  .arg(Arg::new("MODE")
+                     .index(1)
+                     .required(true)
+                     .possible_values(vec!["vi", "emacs"])
+                     .help("The mode for the tags"))
+                  .get_matches();
+
+   // Match the type of tags (calling unwrap() is safe because the argument is required)
+   let tkind = match matches.value_of("MODE").unwrap() {
+      "vi"    => TagsKind::Vi,
+      "emacs" => TagsKind::Emacs,
+      _       => unreachable!()
+   };
+
+   update_all_tags(&tkind).unwrap_or_else(|err| {
          write_to_stderr(&err);
          env::set_exit_status(1);
-      });
-   }
-   else {
-      println!("Usage:
-   rusty-tags vi
-   rusty-tags emacs");
-   }
+   });
 }
 
 fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
