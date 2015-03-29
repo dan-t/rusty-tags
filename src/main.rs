@@ -1,5 +1,5 @@
 #![allow(unused_assignments)]
-#![feature(core, path_ext, exit_status, std_misc, str_char, convert)]
+#![feature(path_ext, exit_status, std_misc, str_char, convert)]
 
 extern crate toml;
 extern crate glob;
