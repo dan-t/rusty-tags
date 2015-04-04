@@ -1,9 +1,10 @@
-use std::fs::{self, PathExt};
+use std::fs;
 use std::env;
 use std::path::PathBuf;
 use glob::{glob, Paths};
 
 use app_result::{AppResult, app_err};
+use path_ext::PathExt;
 
 /// where `rusty-tags` caches its tag files
 pub fn rusty_tags_cache_dir() -> AppResult<PathBuf>

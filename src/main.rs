@@ -6,7 +6,7 @@ extern crate term;
 #[macro_use]
 extern crate clap;
 
-use std::fs::{self, PathExt};
+use std::fs;
 use std::env;
 use std::path::{PathBuf, Path};
 use clap::App;
@@ -14,6 +14,7 @@ use clap::App;
 use app_result::{AppResult, AppErr, app_err};
 use dependencies::read_dependencies;
 use types::{TagsRoot, TagsKind};
+use path_ext::PathExt;
 
 use tags::{
    update_tags,
@@ -29,6 +30,7 @@ mod dependencies;
 mod dirs;
 mod tags;
 mod types;
+mod path_ext;
 
 fn main() 
 {
