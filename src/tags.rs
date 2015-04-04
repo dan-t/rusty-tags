@@ -96,8 +96,10 @@ pub fn merge_tags(tags_kind: &TagsKind, tag_files: &Vec<PathBuf>, into_tag_file:
          let mut merged_lines: Vec<&str> = Vec::with_capacity(100_000);
          for content in file_contents.iter() {
             for line in content.lines_any() {
-               if ! line.is_empty() && line.char_at(0) != '!' {
-                  merged_lines.push(line);
+               if let Some(chr) = line.chars().nth(0) {
+                  if chr != '!' {
+                     merged_lines.push(line);
+                  }
                }
             }
          }

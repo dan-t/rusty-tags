@@ -1,5 +1,5 @@
 use std::io;
-use std::error::FromError;
+use std::convert::From;
 use std::fmt::{self, Display, Formatter};
 use glob;
 
@@ -33,17 +33,17 @@ impl Display for AppErr
    }
 }
 
-impl FromError<io::Error> for AppErr
+impl From<io::Error> for AppErr
 {
-   fn from_error(err: io::Error) -> AppErr
+   fn from(err: io::Error) -> AppErr
    {
       AppErr { error: format!("{}", err) }
    }
 }
 
-impl FromError<glob::PatternError> for AppErr
+impl From<glob::PatternError> for AppErr
 {
-   fn from_error(err: glob::PatternError) -> AppErr
+   fn from(err: glob::PatternError) -> AppErr
    {
       AppErr { error: format!("{}", err) }
    }

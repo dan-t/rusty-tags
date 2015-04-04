@@ -1,5 +1,4 @@
 #![allow(unused_assignments)]
-#![feature(path_ext, exit_status, std_misc, str_char, convert)]
 
 extern crate toml;
 extern crate glob;
@@ -7,7 +6,7 @@ extern crate term;
 
 use std::fs::{self, PathExt};
 use std::env;
-use std::path::{PathBuf, Path, AsPath};
+use std::path::{PathBuf, Path};
 
 use app_result::{AppResult, AppErr, app_err};
 use dependencies::read_dependencies;
@@ -48,7 +47,6 @@ fn main()
    if let Some(tkind) = tags_kind {
       update_all_tags(&tkind).unwrap_or_else(|err| {
          write_to_stderr(&err);
-         env::set_exit_status(1);
       });
    }
    else {
