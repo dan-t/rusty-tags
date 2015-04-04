@@ -4,13 +4,14 @@ extern crate toml;
 extern crate glob;
 extern crate term;
 
-use std::fs::{self, PathExt};
+use std::fs;
 use std::env;
 use std::path::{PathBuf, Path};
 
 use app_result::{AppResult, AppErr, app_err};
 use dependencies::read_dependencies;
 use types::{TagsRoot, TagsKind};
+use path_ext::PathExt;
 
 use tags::{
    update_tags,
@@ -26,6 +27,7 @@ mod dependencies;
 mod dirs;
 mod tags;
 mod types;
+mod path_ext;
 
 fn main() 
 {
