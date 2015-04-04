@@ -1,5 +1,4 @@
 #![allow(unused_assignments)]
-#![feature(path_ext, exit_status, std_misc, str_char)]
 
 extern crate toml;
 extern crate glob;
@@ -9,7 +8,7 @@ extern crate clap;
 
 use std::fs::{self, PathExt};
 use std::env;
-use std::path::{PathBuf, Path, AsPath};
+use std::path::{PathBuf, Path};
 use clap::App;
 
 use app_result::{AppResult, AppErr, app_err};

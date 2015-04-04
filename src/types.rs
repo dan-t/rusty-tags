@@ -1,6 +1,6 @@
 use std::fs::PathExt;
 use std::fmt::{Debug, Formatter, Error};
-use std::path::{PathBuf, AsPath};
+use std::path::PathBuf;
 
 pub enum TagsRoot
 {
