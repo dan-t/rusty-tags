@@ -37,7 +37,7 @@ fn main()
    let matches = App::new("rusty-tags")
                   .about("Create ctags/etags for a cargo project and all of its dependencies")
                   // Pull version from Cargo.toml
-                  .version(&crate_version!()[..])
+                  .version(&format!("v{}", crate_version!())[..])
                   .arg_from_usage("<MODE> 'The mode for the tags (modes: Vi, Emacs)'")
                   .get_matches();
 
@@ -46,7 +46,7 @@ fn main()
 
    update_all_tags(&tkind).unwrap_or_else(|err| {
          write_to_stderr(&err);
-         env::set_exit_status(1);
+         std::process::exit(1);
    });
 }
 
