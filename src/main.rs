@@ -10,7 +10,7 @@ extern crate clap;
 use std::fs::{self, PathExt};
 use std::env;
 use std::path::{PathBuf, Path, AsPath};
-use clap::{App, Arg};
+use clap::App;
 
 use app_result::{AppResult, AppErr, app_err};
 use dependencies::read_dependencies;
@@ -33,18 +33,11 @@ mod types;
 
 fn main() 
 {
-   // Pull version from Cargo.toml
-  let version = format!("{}.{}.{}{}",
-                          env!("CARGO_PKG_VERSION_MAJOR"),
-                          env!("CARGO_PKG_VERSION_MINOR"),
-                          env!("CARGO_PKG_VERSION_PATCH"),
-                          option_env!("CARGO_PKG_VERSION_PRE").unwrap_or("")); 
-
-   // Create the application
    let matches = App::new("rusty-tags")
                   .about("Create ctags/etags for a cargo project and all of its dependencies")
-                  .version(&version[..])
-                  .arg(Arg::from_usage("<MODE> 'The mode for the tags (modes: vi, emacs)'"))
+                  // Pull version from Cargo.toml
+                  .version(&crate_version!()[..])
+                  .arg_from_usage("<MODE> 'The mode for the tags (modes: Vi, Emacs)'")
                   .get_matches();
 
    // Get the enum from the argument, or exit with the default message
