@@ -140,11 +140,13 @@ impl Debug for Tags
 }
 
 /// which kind of tags are created
-#[derive(Eq, PartialEq, Debug)]
-pub enum TagsKind
-{
-   Vi,
-   Emacs
+arg_enum!{
+   #[derive(Eq, PartialEq, Debug)]
+   pub enum TagsKind
+   {
+      Vi,
+      Emacs
+   }
 }
 
 impl TagsKind

@@ -4,6 +4,7 @@
 extern crate toml;
 extern crate glob;
 extern crate term;
+#[macro_use]
 extern crate clap;
 
 use std::fs::{self, PathExt};
@@ -43,19 +44,11 @@ fn main()
    let matches = App::new("rusty-tags")
                   .about("Create ctags/etags for a cargo project and all of its dependencies")
                   .version(&version[..])
-                  .arg(Arg::new("MODE")
-                     .index(1)
-                     .required(true)
-                     .possible_values(vec!["vi", "emacs"])
-                     .help("The mode for the tags"))
+                  .arg(Arg::from_usage("<MODE> 'The mode for the tags (modes: vi, emacs)'"))
                   .get_matches();
 
-   // Match the type of tags (calling unwrap() is safe because the argument is required)
-   let tkind = match matches.value_of("MODE").unwrap() {
-      "vi"    => TagsKind::Vi,
-      "emacs" => TagsKind::Emacs,
-      _       => unreachable!()
-   };
+   // Get the enum from the argument, or exit with the default message
+   let tkind = value_t_or_exit!(matches.value_of("MODE"), TagsKind);
 
    update_all_tags(&tkind).unwrap_or_else(|err| {
          write_to_stderr(&err);
