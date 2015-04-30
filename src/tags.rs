@@ -2,7 +2,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::process::Command;
 use std::collections::HashSet;
-use std::path::{PathBuf, Path, AsPath};
+use std::path::{PathBuf, Path};
 
 use app_result::{AppResult, app_err};
 use types::{Tags, TagsKind, SourceKind};
