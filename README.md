@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/dan-t/rusty-tags.svg?branch=master)](https://travis-ci.org/dan-t/rusty-tags)
+
 rusty-tags
 ==========
 
