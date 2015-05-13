@@ -51,7 +51,7 @@ Rust Standard Library Support
 =============================
 
 The source code of Rust already contains a script for creating tags, but
-if you only want to jump into the standard library than reducing the directories
+if you only want to jump into the standard library then reducing the directories
 gives better results.
 
 First get the Rust source code:
@@ -63,7 +63,7 @@ And now execute the following script inside of the rust directory:
 
     #!/usr/bin/env bash
     
-    src_dirs=`ls -d $PWD/src/{liballoc,libarena,libbacktrace,libcollections,libcore,libflate,libfmt_macros,libgetopts,libgraphviz,liblog,librand,librbml,libserialize,libstd,libsyntax,libterm,libunicode}`
+    src_dirs=`ls -d $PWD/src/{liballoc,libarena,libbacktrace,libcollections,libcore,libflate,libfmt_macros,libgetopts,libgraphviz,liblog,librand,librbml,libserialize,libstd,libsyntax,libterm}`
     
     ctags -f rusty-tags.vi --options=src/etc/ctags.rust --languages=Rust --recurse $src_dirs
     
