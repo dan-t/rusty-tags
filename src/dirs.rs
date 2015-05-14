@@ -3,7 +3,7 @@ use std::env;
 use std::path::PathBuf;
 use glob::{glob, Paths};
 
-use app_result::{AppResult, app_err};
+use app_result::{AppResult, app_err_msg};
 use path_ext::PathExt;
 
 /// where `rusty-tags` caches its tag files
@@ -68,7 +68,7 @@ pub fn cargo_crates_io_src_dir() -> AppResult<PathBuf>
       Ok(path)
    }
    else {
-      Err(app_err(format!("Expected one matching path for '{}'!", src_str)))
+      Err(app_err_msg(format!("Expected one matching path for '{}'!", src_str)))
    }
 }
 
@@ -89,6 +89,6 @@ fn homedir() -> AppResult<PathBuf>
       Ok(path)
    }
    else {
-      Err(app_err("Couldn't read home directory!".to_string()))
+      Err(app_err_msg("Couldn't read home directory!".to_string()))
    }
 }

@@ -1,4 +1,4 @@
-use std::fmt::{Debug, Formatter, Error};
+use std::fmt::{Debug, Display, Formatter, Error};
 use std::path::PathBuf;
 
 use path_ext::PathExt;
@@ -31,12 +31,13 @@ impl Debug for TagsRoot
          },
 
          TagsRoot::Lib { ref src_kind, ref dependencies } => {
-            write!(f, "Lib ( src_kind: {:?}, dependencies: {:?} )", src_kind, dependencies)
+            write!(f, "Lib ( src_kind: {}, dependencies: {:?} )", src_kind, dependencies)
          }
       }
    }
 }
 
+#[derive(Clone)]
 pub enum SourceKind
 {
    /// the source is from a git repository
@@ -79,11 +80,8 @@ impl SourceKind
          }
       }
    }
-}
 
-impl Debug for SourceKind
-{
-   fn fmt(&self, f: &mut Formatter) -> Result<(), Error>
+   fn display(&self, f: &mut Formatter) -> Result<(), Error>
    {
       match *self {
          SourceKind::Git { ref lib_name, ref commit_hash } => {
@@ -94,6 +92,22 @@ impl Debug for SourceKind
             write!(f, "{}-{}", lib_name, version)
          }
       }
+   }
+}
+
+impl Debug for SourceKind
+{
+   fn fmt(&self, f: &mut Formatter) -> Result<(), Error>
+   {
+      self.display(f)
+   }
+}
+
+impl Display for SourceKind
+{
+   fn fmt(&self, f: &mut Formatter) -> Result<(), Error>
+   {
+      self.display(f)
    }
 }
 

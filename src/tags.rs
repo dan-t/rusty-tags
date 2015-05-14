@@ -4,7 +4,7 @@ use std::process::Command;
 use std::collections::HashSet;
 use std::path::{PathBuf, Path};
 
-use app_result::{AppResult, app_err};
+use app_result::{AppResult, app_err_msg, app_err_missing_src};
 use types::{Tags, TagsKind, SourceKind};
 use path_ext::PathExt;
 
@@ -219,9 +219,7 @@ fn find_src_dir(source: &SourceKind) -> AppResult<PathBuf>
             }
          }
 
-         Err(app_err(format!("
-   Couldn't find git repository of the dependency '{}'!
-   Have you run 'cargo build' at least once or have you added/updated a dependency without calling 'cargo build' again?", lib_name)))
+         Err(app_err_missing_src(source))
       },
 
       SourceKind::CratesIo { ref lib_name, ref version } => {
@@ -233,9 +231,7 @@ fn find_src_dir(source: &SourceKind) -> AppResult<PathBuf>
          src_dir.push(&lib_src);
 
          if ! src_dir.is_dir() {
-            return Err(app_err(format!("
-   Couldn't find source code of the dependency '{}'!
-   Have you run 'cargo build' at least once or have you added/updated a dependency without calling 'cargo build' again?", lib_name)))
+            return Err(app_err_missing_src(source));
          }
 
          Ok(src_dir)
@@ -322,5 +318,5 @@ fn get_commit_hash(git_dir: &Path) -> AppResult<String>
    let out = try!(cmd.output());
    String::from_utf8(out.stdout)
       .map(|s| s.trim().to_string())
-      .map_err(|_| app_err("Couldn't convert git output to utf8!".to_string()))
+      .map_err(|_| app_err_msg("Couldn't convert git output to utf8!".to_string()))
 }

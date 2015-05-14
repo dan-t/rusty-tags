@@ -8,7 +8,7 @@ use std::fs;
 use std::env;
 use std::path::{PathBuf, Path};
 
-use app_result::{AppResult, AppErr, app_err};
+use app_result::{AppResult, AppErr, app_err_msg};
 use dependencies::read_dependencies;
 use types::{TagsRoot, TagsKind};
 use path_ext::PathExt;
@@ -65,6 +65,7 @@ fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
    let tags_roots = try!(read_dependencies(&cargo_dir));
 
    let rust_std_lib_tags_file = try!(rust_std_lib_tags_file(tags_kind));
+   let mut missing_sources = Vec::new();
 
    for tags_root in tags_roots.iter() {
       let mut tag_files: Vec<PathBuf> = Vec::new();
@@ -80,7 +81,12 @@ fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
             for dep in dependencies.iter() {
                match update_tags(tags_kind, dep) {
                   Ok(tags) => tag_files.push(tags.tags_file),
-                  Err(err) => write_to_stderr(&err)
+                  Err(app_err) => {
+                     match app_err {
+                        AppErr::MissingSource(src_kind) => missing_sources.push(src_kind),
+                        _ => return Err(app_err)
+                     }
+                  }
                }
             }
 
@@ -98,9 +104,15 @@ fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
                  }
                }
 
-               Err(err) => {
-                   write_to_stderr(&err);
-                   continue;
+               Err(app_err) => {
+                  match app_err {
+                     AppErr::MissingSource(src_kind) => {
+                        missing_sources.push(src_kind);
+                        continue;
+                     }
+
+                     _ => return Err(app_err)
+                  }
                }
             };
 
@@ -109,7 +121,12 @@ fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
             for dep in dependencies.iter() {
                match update_tags(tags_kind, dep) {
                   Ok(tags) => tag_files.push(tags.tags_file),
-                  Err(err) => write_to_stderr(&err)
+                  Err(app_err) => {
+                     match app_err {
+                        AppErr::MissingSource(src_kind) => missing_sources.push(src_kind),
+                        _ => return Err(app_err)
+                     }
+                  }
                }
             }
 
@@ -129,6 +146,18 @@ fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
       tags_file.push(tags_kind.tags_file_name());
 
       try!(merge_tags(tags_kind, &tag_files, &tags_file));
+   }
+
+   if ! missing_sources.is_empty() {
+      println!("Couldn't find source code of dependencies:");
+      for src in missing_sources.iter() {
+         println!("   {}", src);
+      }
+
+      println!("
+Have you run 'cargo build' at least once or have you added/updated a dependency without calling 'cargo build' again?
+The dependencies might also be platform specific and not needed on your current platform.
+");
    }
 
    Ok(())
@@ -154,7 +183,7 @@ fn find_cargo_toml_dir(start_dir: &Path) -> AppResult<PathBuf>
       }
 
       if ! dir.pop() {
-         return Err(app_err(format!("Couldn't find 'Cargo.toml' starting at directory '{}'!", start_dir.display())));
+         return Err(app_err_msg(format!("Couldn't find 'Cargo.toml' starting at directory '{}'!", start_dir.display())));
       }
    }
 }
