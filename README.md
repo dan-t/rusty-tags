@@ -21,7 +21,7 @@ Installation
 * `cd rusty-tags`
 * `cargo build --release`
 
-(Last successful build with: rustc 1.0.0-beta.3 (5241bf9c3 2015-04-25))
+(Last successful build with: rustc 1.0.0-beta.5 (7b4ef47b7 2015-05-11))
 
 The build binary will be located at `target/release/rusty-tags`.
 
