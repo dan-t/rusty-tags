@@ -11,4 +11,3 @@ readme = "README.md"
 [dependencies]
 glob = "~0.2.2"
 toml = "~0.1.12"
-term = "~0.2.2"

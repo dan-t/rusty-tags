@@ -2,11 +2,12 @@
 
 extern crate toml;
 extern crate glob;
-extern crate term;
 
 use std::fs;
 use std::env;
 use std::path::{PathBuf, Path};
+use std::process;
+use std::io::{self, Write};
 
 use app_result::{AppResult, AppErr, app_err_msg};
 use dependencies::read_dependencies;
@@ -48,7 +49,8 @@ fn main()
 
    if let Some(tkind) = tags_kind {
       update_all_tags(&tkind).unwrap_or_else(|err| {
-         write_to_stderr(&err);
+         writeln!(&mut io::stderr(), "{}", err).unwrap();
+         process::exit(1);
       });
    }
    else {
@@ -195,11 +197,4 @@ fn rust_std_lib_tags_file(tags_kind: &TagsKind) -> AppResult<PathBuf>
    tags_file.push(&format!("rust-std-lib.{}", tags_kind.tags_file_extension()));
 
    Ok(tags_file)
-}
-
-fn write_to_stderr(err: &AppErr)
-{
-   if let Some(mut stderr) = term::stderr() {
-      let _ = writeln!(&mut stderr, "rusty-tags: {}", err);
-   }
 }
