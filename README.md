@@ -61,7 +61,7 @@ And now execute the following script inside of the rust directory:
 
     #!/usr/bin/env bash
     
-    src_dirs=`ls -d $PWD/src/{liballoc,libarena,libbacktrace,libcollections,libcore,libflate,libfmt_macros,libgetopts,libgraphviz,liblog,librand,librbml,libserialize,libstd,libsyntax,libterm}`
+    src_dirs=`echo $PWD/src/{liballoc,libarena,libbacktrace,libcollections,libcore,libflate,libfmt_macros,libgetopts,libgraphviz,liblog,librand,librbml,libserialize,libstd,libsyntax,libterm}`
     
     ctags -f rusty-tags.vi --options=src/etc/ctags.rust --languages=Rust --recurse $src_dirs
     
