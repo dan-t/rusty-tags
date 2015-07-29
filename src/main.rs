@@ -37,8 +37,8 @@ fn main()
    let matches = App::new("rusty-tags")
                   .about("Create ctags/etags for a cargo project and all of its dependencies")
                   // Pull version from Cargo.toml
-                  .version(&format!("v{}", crate_version!())[..])
-                  .arg_from_usage("<MODE> 'The mode for the tags (modes: Vi, Emacs)'")
+                  .version(&*format!("v{}", crate_version!()))
+                  .arg_from_usage("<MODE> 'The mode for the tags (modes: vi, emacs)'")
                   .get_matches();
 
    // Get the enum from the argument, or exit with the default message
