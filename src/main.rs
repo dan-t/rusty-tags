@@ -3,11 +3,14 @@
 extern crate toml;
 extern crate glob;
 
+#[macro_use]
+extern crate clap;
+
 use std::fs;
 use std::env;
 use std::path::{PathBuf, Path};
-use std::process;
 use std::io::{self, Write};
+use clap::App;
 
 use app_result::{AppResult, AppErr, app_err_msg};
 use dependencies::read_dependencies;
@@ -32,32 +35,20 @@ mod path_ext;
 
 fn main() 
 {
-   let mut args = env::args();
-   let tags_kind =
-      if args.len() == 2 {
-         args.nth(1).and_then(|arg| {
-            match arg.as_ref() {
-               "vi"    => Some(TagsKind::Vi),
-               "emacs" => Some(TagsKind::Emacs),
-               _       => None
-            }
-         })
-      }
-      else {
-         None
-      };
+   let matches = App::new("rusty-tags")
+      .about("Create ctags/etags for a cargo project and all of its dependencies")
+      // Pull version from Cargo.toml
+      .version(&*format!("v{}", crate_version!()))
+      .arg_from_usage("<MODE> 'The mode for the tags (modes: vi, emacs)'")
+      .get_matches();
 
-   if let Some(tkind) = tags_kind {
-      update_all_tags(&tkind).unwrap_or_else(|err| {
-         writeln!(&mut io::stderr(), "{}", err).unwrap();
-         process::exit(1);
-      });
-   }
-   else {
-      println!("Usage:
-   rusty-tags vi
-   rusty-tags emacs");
-   }
+   // Get the enum from the argument, or exit with the default message
+   let tkind = value_t_or_exit!(matches.value_of("MODE"), TagsKind);
+
+   update_all_tags(&tkind).unwrap_or_else(|err| {
+      writeln!(&mut io::stderr(), "{}", err).unwrap();
+      std::process::exit(1);
+   });
 }
 
 fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
