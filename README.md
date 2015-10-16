@@ -120,3 +120,10 @@ line is added to the emacs tags file which includes the tags files
 of the dependencies.
 
 I haven't tested the emacs tags, so some feedback would be nice!
+
+MacOS Issues
+============
+
+Mac OS users may encounter problems with the execution of `ctags` because the shipped version
+of this program does not support the recursive flag. See [this posting](http://gmarik.info/blog/2010/10/08/ctags-on-OSX) 
+for how to install a working version with homebrew.
