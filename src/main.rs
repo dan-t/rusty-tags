@@ -1,3 +1,4 @@
+// to silence a bogus warning about `tag_dir` being unused
 #![allow(unused_assignments)]
 
 extern crate toml;
