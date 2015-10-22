@@ -10,6 +10,7 @@ use std::fs;
 use std::env;
 use std::path::{PathBuf, Path};
 use std::io::{self, Write};
+use std::process::Command;
 use clap::App;
 
 use app_result::{AppResult, AppErr, app_err_msg};
@@ -54,6 +55,8 @@ fn main()
 
 fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
 {
+   try!(fetch_source_of_dependencies());
+
    let cwd = try!(env::current_dir());
    let cargo_dir = try!(find_cargo_toml_dir(&cwd));
    let tags_roots = try!(read_dependencies(&cargo_dir));
@@ -149,11 +152,22 @@ fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
       }
 
       println!("
-Have you run 'cargo build' at least once or have you added/updated a dependency without calling 'cargo build' again?
+Have you run 'cargo fetch' at least once or have you added/updated a dependency without calling 'cargo fetch' again?
 The dependencies might also be platform specific and not needed on your current platform.
 ");
    }
 
+   Ok(())
+}
+
+fn fetch_source_of_dependencies() -> AppResult<()>
+{
+   println!("Fetching sources of dependencies ...");
+
+   let mut cmd = Command::new("cargo");
+   cmd.arg("fetch");
+
+   let _ = try!(cmd.output());
    Ok(())
 }
 
