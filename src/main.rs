@@ -39,11 +39,12 @@ fn main()
       .about("Create ctags/etags for a cargo project and all of its dependencies")
       // Pull version from Cargo.toml
       .version(&*format!("v{}", crate_version!()))
-      .arg_from_usage("<MODE> 'The mode for the tags (modes: vi, emacs)'")
+      .author("Daniel Trstenjak <daniel.trstenjak@gmail.com>")
+      .arg_from_usage("<TAGS_KIND> 'The kind of the created tags (vi, emacs)'")
       .get_matches();
 
    // Get the enum from the argument, or exit with the default message
-   let tkind = value_t_or_exit!(matches.value_of("MODE"), TagsKind);
+   let tkind = value_t_or_exit!(matches.value_of("TAGS_KIND"), TagsKind);
 
    update_all_tags(&tkind).unwrap_or_else(|err| {
       writeln!(&mut io::stderr(), "{}", err).unwrap();
