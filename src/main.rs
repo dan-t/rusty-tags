@@ -153,8 +153,8 @@ fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
       }
 
       println!("
-Have you run 'cargo fetch' at least once or have you added/updated a dependency without calling 'cargo fetch' again?
-The dependencies might also be platform specific and not needed on your current platform.
+The dependencies might be platform specific and not needed on your current platform.
+You might try calling 'cargo fetch' by hand again.
 ");
    }
 
@@ -163,7 +163,7 @@ The dependencies might also be platform specific and not needed on your current 
 
 fn fetch_source_of_dependencies() -> AppResult<()>
 {
-   println!("Fetching sources of dependencies ...");
+   println!("Fetching source of dependencies ...");
 
    let mut cmd = Command::new("cargo");
    cmd.arg("fetch");
