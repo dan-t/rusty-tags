@@ -72,7 +72,7 @@ Vim Configuration
 
 Put this into your `~/.vim/after/ftplugin/rust.vim` file:
 
-    set tags=rusty-tags.vi;/,path-to-rust-source-code/rusty-tags.vi
+    setlocal tags=rusty-tags.vi;/,path-to-rust-source-code/rusty-tags.vi
     autocmd BufWrite *.rs :silent !rusty-tags vi
 
 The first line (only supported by vim >= 7.4) ensures that vim will
