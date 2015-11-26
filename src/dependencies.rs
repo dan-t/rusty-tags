@@ -32,6 +32,11 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
          .ok_or(app_err_msg(format!("Couldn't get toml::Table entry for 'dependency'!")))
    );
 
+   if deps_table.is_empty() {
+      tags_roots.push(TagsRoot::Src { src_dir: cargo_toml_dir.to_path_buf(), dependencies: Vec::new() });
+      return Ok(tags_roots);
+   }
+
    let lock_table = {
       let mut cargo_lock = cargo_toml_dir.to_path_buf();
       cargo_lock.push("Cargo.lock");
