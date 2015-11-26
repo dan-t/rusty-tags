@@ -38,7 +38,7 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
       try!(parse_toml(&cargo_lock))
    };
 
-   let packages: Vec<&toml::Table> = try!(
+   let packages: Vec<&toml::Table> =
       lock_table.get("package")
          .and_then(toml::Value::as_slice)
          .map(|s| {
@@ -46,8 +46,7 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
              .filter_map(toml::Value::as_table)
              .collect()
          })
-         .ok_or(app_err_msg(format!("Couldn't get Array of Tables entry for 'package'!")))
-   );
+         .unwrap_or(vec![]);
 
    for package in packages.iter() {
       let lib_name = try!(
