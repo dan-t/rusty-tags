@@ -96,7 +96,7 @@ pub fn merge_tags(tags_kind: &TagsKind, tag_files: &Vec<PathBuf>, into_tag_file:
 
          let mut merged_lines: Vec<&str> = Vec::with_capacity(100_000);
          for content in file_contents.iter() {
-            for line in content.lines_any() {
+            for line in content.lines() {
                if let Some(chr) = line.chars().nth(0) {
                   if chr != '!' {
                      merged_lines.push(line);
@@ -260,7 +260,7 @@ fn find_reexported_crates(src_dir: &Path) -> AppResult<Vec<CrateName>>
       contents
    };
 
-   let lines = contents.lines_any();
+   let lines = contents.lines();
 
    type ModuleName = String;
    let mut pub_uses = HashSet::<ModuleName>::new();
