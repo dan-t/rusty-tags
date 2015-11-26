@@ -38,8 +38,10 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
       try!(parse_toml(&cargo_lock))
    };
 
+   let default = toml::Value::Array(vec![]);
    let packages: Vec<&toml::Table> = try!(
       lock_table.get("package")
+         .or(Some(&default))
          .and_then(toml::Value::as_slice)
          .map(|s| {
             s.iter()
