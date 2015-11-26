@@ -1,6 +1,7 @@
 use std::fs;
 use std::env;
 use std::path::PathBuf;
+use std::process::Command;
 use glob::{glob, Paths};
 
 use app_result::{AppResult, app_err_msg};
@@ -75,6 +76,25 @@ pub fn cargo_crates_io_src_dir() -> AppResult<PathBuf>
 /// where cargo puts all of its stuff
 fn cargo_dir() -> AppResult<PathBuf>
 {
+   if let Ok(out) = Command::new("multirust").arg("show-override").output() {
+      let output = try!(
+         String::from_utf8(out.stdout)
+            .map_err(|_| app_err_msg("Couldn't convert git output to utf8!".to_string()))
+      );
+
+      for line in output.lines() {
+         let strs: Vec<&str> = line.split(" location: ").collect();
+         if strs.len() == 2 {
+            let mut path = PathBuf::new();
+            path.push(strs[1]);
+            path.push("cargo");
+            if path.is_dir() {
+               return Ok(path);
+            }
+         }
+      }
+   }
+
    homedir().map(|mut d| { d.push(".cargo"); d })
 }
 
