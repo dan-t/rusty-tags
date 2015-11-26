@@ -38,15 +38,18 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
       try!(parse_toml(&cargo_lock))
    };
 
-   let packages: Vec<&toml::Table> =
+   let default = toml::Value::Array(vec![]);
+   let packages: Vec<&toml::Table> = try!(
       lock_table.get("package")
+         .or(Some(&default))
          .and_then(toml::Value::as_slice)
          .map(|s| {
             s.iter()
              .filter_map(toml::Value::as_table)
              .collect()
          })
-         .unwrap_or(vec![]);
+         .ok_or(app_err_msg(format!("Couldn't get Array of Tables entry for 'package'!")))
+   );
 
    for package in packages.iter() {
       let lib_name = try!(
