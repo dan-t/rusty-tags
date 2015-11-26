@@ -1,3 +1,7 @@
-0.6
----
+0.6.1
+-----
+* Handle empty 'dependencies' entry in 'Cargo.toml'
+
+0.6.0
+-----
 * Support multirust
