@@ -93,6 +93,8 @@ fn cargo_dir() -> AppResult<PathBuf>
             }
          }
       }
+
+      return Err(app_err_msg(format!("Couldn't get multirust cargo location from output:\n{}", output)));
    }
 
    homedir().map(|mut d| { d.push(".cargo"); d })
