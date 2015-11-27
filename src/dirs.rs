@@ -146,7 +146,7 @@ fn cargo_dir_internal() -> AppResult<PathBuf>
    if let Ok(out) = Command::new("multirust").arg("show-override").output() {
       let output = try!(
          String::from_utf8(out.stdout)
-            .map_err(|_| app_err_msg("Couldn't convert git output to utf8!".to_string()))
+            .map_err(|_| app_err_msg("Couldn't convert 'multirust show-override' output to utf8!".to_string()))
       );
 
       for line in output.lines() {

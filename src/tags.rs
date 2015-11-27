@@ -318,5 +318,5 @@ fn get_commit_hash(git_dir: &Path) -> AppResult<String>
    let out = try!(cmd.output());
    String::from_utf8(out.stdout)
       .map(|s| s.trim().to_string())
-      .map_err(|_| app_err_msg("Couldn't convert git output to utf8!".to_string()))
+      .map_err(|_| app_err_msg("Couldn't convert 'git rev-parse HEAD' output to utf8!".to_string()))
 }
