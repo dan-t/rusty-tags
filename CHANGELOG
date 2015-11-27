@@ -1,3 +1,7 @@
+0.6.2
+-----
+* Determine rusty-tags and cargo directories only once
+
 0.6.1
 -----
 * Handle empty 'dependencies' entry in 'Cargo.toml'
