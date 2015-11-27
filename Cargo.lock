@@ -4,6 +4,7 @@ version = "0.6.1"
 dependencies = [
  "clap 1.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "glob 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 0.1.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "toml 0.1.23 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -24,6 +25,11 @@ dependencies = [
 [[package]]
 name = "glob"
 version = "0.2.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "lazy_static"
+version = "0.1.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]

@@ -1,20 +1,91 @@
 use std::fs;
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use glob::{glob, Paths};
 
 use app_result::{AppResult, app_err_msg};
 use path_ext::PathExt;
 
+lazy_static! {
+   static ref HOME_DIR               : AppResult<PathBuf> = home_dir_internal();
+   static ref RUSTY_TAGS_DIR         : AppResult<PathBuf> = rusty_tags_dir_internal();
+   static ref RUSTY_TAGS_CACHE_DIR   : AppResult<PathBuf> = rusty_tags_cache_dir_internal();
+   static ref CARGO_DIR              : AppResult<PathBuf> = cargo_dir_internal();
+   static ref CARGO_GIT_SRC_DIR      : AppResult<PathBuf> = cargo_git_src_dir_internal();
+   static ref CARGO_CRATES_IO_SRC_DIR: AppResult<PathBuf> = cargo_crates_io_src_dir_internal();
+}
+
+/// where rusty-tags puts all of its stuff
+pub fn rusty_tags_dir() -> AppResult<&'static Path>
+{
+   RUSTY_TAGS_DIR
+      .as_ref()
+      .map(|pb| pb.as_path())
+      .map_err(|err| err.clone())
+}
+
 /// where `rusty-tags` caches its tag files
-pub fn rusty_tags_cache_dir() -> AppResult<PathBuf>
+pub fn rusty_tags_cache_dir() -> AppResult<&'static Path>
+{
+   RUSTY_TAGS_CACHE_DIR
+      .as_ref()
+      .map(|pb| pb.as_path())
+      .map_err(|err| err.clone())
+}
+
+/// where cargo puts its git checkouts
+pub fn cargo_git_src_dir() -> AppResult<&'static Path>
+{
+   CARGO_GIT_SRC_DIR
+      .as_ref()
+      .map(|pb| pb.as_path())
+      .map_err(|err| err.clone())
+}
+
+/// where cargo puts the source code of crates.io
+pub fn cargo_crates_io_src_dir() -> AppResult<&'static Path>
+{
+   CARGO_CRATES_IO_SRC_DIR
+      .as_ref()
+      .map(|pb| pb.as_path())
+      .map_err(|err| err.clone())
+}
+
+pub fn glob_path(pattern: &String) -> AppResult<Paths>
+{
+   Ok(try!(glob(&pattern)))
+}
+
+fn home_dir() -> AppResult<PathBuf>
+{
+   HOME_DIR.clone()
+}
+
+fn cargo_dir() -> AppResult<PathBuf>
+{
+   CARGO_DIR.clone()
+}
+
+fn home_dir_internal() -> AppResult<PathBuf>
+{
+   if let Some(path) = env::home_dir() {
+      Ok(path)
+   }
+   else {
+      Err(app_err_msg("Couldn't read home directory!".to_string()))
+   }
+}
+
+fn rusty_tags_cache_dir_internal() -> AppResult<PathBuf>
 {
    let dir = try!(
-      rusty_tags_dir().map(|mut d| {
-         d.push("cache");
-         d
-      })
+      rusty_tags_dir()
+         .map(Path::to_path_buf)
+         .map(|mut d| {
+            d.push("cache");
+            d
+         })
    );
 
    if ! dir.is_dir() {
@@ -24,11 +95,10 @@ pub fn rusty_tags_cache_dir() -> AppResult<PathBuf>
    Ok(dir)
 }
 
-/// where rusty-tags puts all of its stuff
-pub fn rusty_tags_dir() -> AppResult<PathBuf>
+fn rusty_tags_dir_internal() -> AppResult<PathBuf>
 {
    let dir = try!(
-      homedir().map(|mut d| {
+      home_dir().map(|mut d| {
          d.push(".rusty-tags");
          d 
       })
@@ -41,8 +111,7 @@ pub fn rusty_tags_dir() -> AppResult<PathBuf>
    Ok(dir)
 }
 
-/// where cargo puts its git checkouts
-pub fn cargo_git_src_dir() -> AppResult<PathBuf>
+fn cargo_git_src_dir_internal() -> AppResult<PathBuf>
 {
    cargo_dir().map(|mut d| {
       d.push("git");
@@ -51,8 +120,7 @@ pub fn cargo_git_src_dir() -> AppResult<PathBuf>
    })
 }
 
-/// where cargo puts the source code of crates.io
-pub fn cargo_crates_io_src_dir() -> AppResult<PathBuf>
+fn cargo_crates_io_src_dir_internal() -> AppResult<PathBuf>
 {
    let src_dir = try!(
       cargo_dir().map(|mut d| {
@@ -73,8 +141,7 @@ pub fn cargo_crates_io_src_dir() -> AppResult<PathBuf>
    }
 }
 
-/// where cargo puts all of its stuff
-fn cargo_dir() -> AppResult<PathBuf>
+fn cargo_dir_internal() -> AppResult<PathBuf>
 {
    if let Ok(out) = Command::new("multirust").arg("show-override").output() {
       let output = try!(
@@ -97,20 +164,5 @@ fn cargo_dir() -> AppResult<PathBuf>
       return Err(app_err_msg(format!("Couldn't get multirust cargo location from output:\n{}", output)));
    }
 
-   homedir().map(|mut d| { d.push(".cargo"); d })
-}
-
-pub fn glob_path(pattern: &String) -> AppResult<Paths>
-{
-   Ok(try!(glob(&pattern)))
-}
-
-fn homedir() -> AppResult<PathBuf>
-{
-   if let Some(path) = env::home_dir() {
-      Ok(path)
-   }
-   else {
-      Err(app_err_msg("Couldn't read home directory!".to_string()))
-   }
+   home_dir().map(|mut d| { d.push(".cargo"); d })
 }

@@ -21,7 +21,7 @@ pub fn update_tags(tags_kind: &TagsKind, source: &SourceKind) -> AppResult<Tags>
 {
    let cache_dir = try!(rusty_tags_cache_dir());
 
-   let mut src_tags = cache_dir.clone();
+   let mut src_tags = cache_dir.to_path_buf();
    src_tags.push(&source.tags_file_name(tags_kind));
 
    let src_dir = try!(find_src_dir(source));
@@ -188,7 +188,7 @@ fn find_src_dir(source: &SourceKind) -> AppResult<PathBuf>
          let mut lib_src = lib_name.clone();
          lib_src.push_str("-*");
 
-         let mut src_dir = try!(cargo_git_src_dir());
+         let mut src_dir = try!(cargo_git_src_dir().map(Path::to_path_buf));
          src_dir.push(&lib_src);
          src_dir.push("master");
 
@@ -205,7 +205,7 @@ fn find_src_dir(source: &SourceKind) -> AppResult<PathBuf>
          // the git repository name hasn't to match the name of the library,
          // so here we're just going through all git directories and searching
          // for the one with a matching commit hash
-         let mut src_dir = try!(cargo_git_src_dir());
+         let mut src_dir = try!(cargo_git_src_dir().map(Path::to_path_buf));
          src_dir.push("*");
          src_dir.push("master");
 
@@ -227,7 +227,7 @@ fn find_src_dir(source: &SourceKind) -> AppResult<PathBuf>
          lib_src.push('-');
          lib_src.push_str(&**version);
 
-         let mut src_dir = try!(cargo_crates_io_src_dir());
+         let mut src_dir = try!(cargo_crates_io_src_dir().map(Path::to_path_buf));
          src_dir.push(&lib_src);
 
          if ! src_dir.is_dir() {

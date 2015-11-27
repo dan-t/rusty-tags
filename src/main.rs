@@ -7,6 +7,9 @@ extern crate glob;
 #[macro_use]
 extern crate clap;
 
+#[macro_use]
+extern crate lazy_static;
+
 use std::fs;
 use std::env;
 use std::path::{PathBuf, Path};
@@ -200,7 +203,7 @@ fn find_cargo_toml_dir(start_dir: &Path) -> AppResult<PathBuf>
 /// the tags file containing the tags for the rust standard library
 fn rust_std_lib_tags_file(tags_kind: &TagsKind) -> AppResult<PathBuf>
 {
-   let mut tags_file = try!(rusty_tags_dir());
+   let mut tags_file = try!(rusty_tags_dir().map(Path::to_path_buf));
    tags_file.push(&format!("rust-std-lib.{}", tags_kind.tags_file_extension()));
 
    Ok(tags_file)
