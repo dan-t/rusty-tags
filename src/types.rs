@@ -50,6 +50,12 @@ pub enum SourceKind
    CratesIo {
       lib_name: String,
       version: String
+   },
+
+   /// the source is from a local directory
+   Path {
+      lib_name: String,
+      path: PathBuf
    }
 }
 
@@ -64,6 +70,10 @@ impl SourceKind
 
          SourceKind::CratesIo { ref lib_name, ref version } => {
             format!("{}-{}.{}", lib_name, version, tags_kind.tags_file_extension())
+         },
+
+         SourceKind::Path { .. } => {
+            tags_kind.tags_file_name().to_owned()
          }
       }
    }
@@ -76,6 +86,10 @@ impl SourceKind
          },
 
          SourceKind::CratesIo { ref lib_name, .. } => {
+            lib_name.clone()
+         },
+
+         SourceKind::Path { ref lib_name, .. } => {
             lib_name.clone()
          }
       }
@@ -90,6 +104,10 @@ impl SourceKind
 
          SourceKind::CratesIo { ref lib_name, ref version } => {
             write!(f, "{}-{}", lib_name, version)
+         },
+
+         SourceKind::Path { ref lib_name, ref path } => {
+            write!(f, "{}: {}", lib_name, path.display())
          }
       }
    }

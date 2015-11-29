@@ -19,11 +19,7 @@ use dirs::{
 /// and if not it's creating a new tags file and returning it.
 pub fn update_tags(tags_kind: &TagsKind, source: &SourceKind) -> AppResult<Tags>
 {
-   let cache_dir = try!(rusty_tags_cache_dir());
-
-   let mut src_tags = cache_dir.to_path_buf();
-   src_tags.push(&source.tags_file_name(tags_kind));
-
+   let src_tags = try!(cached_tags_file(tags_kind, source));
    let src_dir = try!(find_src_dir(source));
    if src_tags.as_path().is_file() {
       return Ok(Tags::new(&src_dir, &src_tags, true));
@@ -235,6 +231,32 @@ fn find_src_dir(source: &SourceKind) -> AppResult<PathBuf>
          }
 
          Ok(src_dir)
+      },
+
+      SourceKind::Path { ref path, .. } => {
+         if ! path.is_dir() {
+            return Err(app_err_missing_src(source));
+         }
+
+         Ok(path.clone())
+      }
+   }
+}
+
+/// returns the position and name of the cached tags file of `source`
+fn cached_tags_file(tags_kind: &TagsKind, source: &SourceKind) -> AppResult<PathBuf>
+{
+   match *source {
+      SourceKind::Git { .. } | SourceKind::CratesIo { .. } => {
+         let mut tags_file = try!(rusty_tags_cache_dir().map(Path::to_path_buf));
+         tags_file.push(&source.tags_file_name(tags_kind));
+         Ok(tags_file)
+      },
+
+      SourceKind::Path { ref path, .. } => {
+         let mut tags_file = path.clone();
+         tags_file.push(&source.tags_file_name(tags_kind));
+         Ok(tags_file)
       }
    }
 }

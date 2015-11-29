@@ -78,11 +78,30 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
    let mut lib_src_kinds: Vec<SourceKind> = Vec::new();
    for (lib_name, value) in deps_table.iter() {
       match *value {
-         toml::Value::String(_) | toml::Value::Table(_) => {
+         // handling of git and crates.io dependencies
+         toml::Value::String(_) => {
             let lib_package = try!(find_package(&packages, &lib_name));
-            if let Ok(src_kind) = get_source_kind(lib_package, &lib_name) {
-               lib_src_kinds.push(src_kind);
+            lib_src_kinds.push(try!(get_source_kind(lib_package, &lib_name)));
+         }
+
+         // handling of local path dependencies
+         toml::Value::Table(ref table) => {
+            let mut path = try!(
+               table.get("path")
+                  .ok_or_else(|| { app_err_msg(format!("Couldn't get 'path' entry from '{}'", value)) })
+                  .and_then(|v| { v.as_str().ok_or_else(|| {
+                     app_err_msg(format!("Expected a String for 'path' entry in '{}'", value))
+                  })})
+                  .map(|s| Path::new(s).to_path_buf())
+            );
+
+            if path.is_relative() {
+               let mut abs_path = cargo_toml_dir.to_path_buf();
+               abs_path.push(path);
+               path = abs_path;
             }
+
+            lib_src_kinds.push(SourceKind::Path { lib_name: lib_name.clone(), path: path });
          }
 
          _ => {
