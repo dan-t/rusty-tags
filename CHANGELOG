@@ -1,3 +1,8 @@
+0.6.4
+-----
+* Add option --force-recreate
+* Support first level local path dependencies
+
 0.6.2
 -----
 * Determine rusty-tags and cargo directories only once

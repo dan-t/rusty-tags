@@ -39,7 +39,8 @@ further to its dependencies.
 `rusty-tags` should also correctly handle the case if a dependency reexports
 parts of its own dependencies.
 
-Currently `rusty-tags` doesn't support local dependencies and dependency overwrites.
+Currently `rusty-tags` doesn't support dependency overrides and local path
+dependencies are only supported if they're contained in your projects `Cargo.toml`.
 For git dependencies it only searches inside of `~/.cargo/git/checkouts/` and for
 crates.io dependencies inside of `~/.cargo/registry/src/github.com-*`.
 
