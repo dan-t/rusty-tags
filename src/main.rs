@@ -15,7 +15,6 @@ use std::env;
 use std::path::{PathBuf, Path};
 use std::io::{self, Write};
 use std::process::Command;
-use clap::App;
 
 use app_result::{AppResult, AppErr, app_err_msg};
 use dependencies::read_dependencies;
@@ -30,6 +29,7 @@ use tags::{
 };
 
 use dirs::rusty_tags_dir;
+use config::{get_config_from_args, Config};
 
 mod app_result;
 mod dependencies;
@@ -37,27 +37,19 @@ mod dirs;
 mod tags;
 mod types;
 mod path_ext;
+mod config;
 
 fn main() 
 {
-   let matches = App::new("rusty-tags")
-      .about("Create ctags/etags for a cargo project and all of its dependencies")
-      // Pull version from Cargo.toml
-      .version(&*format!("v{}", crate_version!()))
-      .author("Daniel Trstenjak <daniel.trstenjak@gmail.com>")
-      .arg_from_usage("<TAGS_KIND> 'The kind of the created tags (vi, emacs)'")
-      .get_matches();
+   let config = get_config_from_args();
 
-   // Get the enum from the argument, or exit with the default message
-   let tkind = value_t_or_exit!(matches.value_of("TAGS_KIND"), TagsKind);
-
-   update_all_tags(&tkind).unwrap_or_else(|err| {
+   update_all_tags(&config).unwrap_or_else(|err| {
       writeln!(&mut io::stderr(), "{}", err).unwrap();
       std::process::exit(1);
    });
 }
 
-fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
+fn update_all_tags(config: &Config) -> AppResult<()>
 {
    try!(fetch_source_of_dependencies());
 
@@ -65,7 +57,7 @@ fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
    let cargo_dir = try!(find_cargo_toml_dir(&cwd));
    let tags_roots = try!(read_dependencies(&cargo_dir));
 
-   let rust_std_lib_tags_file = try!(rust_std_lib_tags_file(tags_kind));
+   let rust_std_lib_tags_file = try!(rust_std_lib_tags_file(&config.tags_kind));
    let mut missing_sources = Vec::new();
 
    for tags_root in tags_roots.iter() {
@@ -75,12 +67,12 @@ fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
       match *tags_root {
          TagsRoot::Src { ref src_dir, ref dependencies } => {
             let mut src_tags = src_dir.clone();
-            src_tags.push(tags_kind.tags_file_name());
-            try!(create_tags(tags_kind, src_dir, &src_tags));
+            src_tags.push(config.tags_kind.tags_file_name());
+            try!(create_tags(config, src_dir, &src_tags));
             tag_files.push(src_tags);
 
             for dep in dependencies.iter() {
-               match update_tags(tags_kind, dep) {
+               match update_tags(config, dep) {
                   Ok(tags) => tag_files.push(tags.tags_file),
                   Err(app_err) => {
                      match app_err {
@@ -95,9 +87,9 @@ fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
          },
 
          TagsRoot::Lib { ref src_kind, ref dependencies } => {
-            let lib_tags = match update_tags_and_check_for_reexports(tags_kind, src_kind, dependencies) {
+            let lib_tags = match update_tags_and_check_for_reexports(config, src_kind, dependencies) {
                Ok(tags) => {
-                 if tags.is_up_to_date(tags_kind) {
+                 if tags.is_up_to_date(&config.tags_kind) && ! config.force_recreate {
                     continue;
                  }
                  else {
@@ -120,7 +112,7 @@ fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
             tag_files.push(lib_tags.tags_file);
 
             for dep in dependencies.iter() {
-               match update_tags(tags_kind, dep) {
+               match update_tags(config, dep) {
                   Ok(tags) => tag_files.push(tags.tags_file),
                   Err(app_err) => {
                      match app_err {
@@ -144,9 +136,9 @@ fn update_all_tags(tags_kind: &TagsKind) -> AppResult<()>
       }
 
       let mut tags_file = tag_dir.unwrap();
-      tags_file.push(tags_kind.tags_file_name());
+      tags_file.push(config.tags_kind.tags_file_name());
 
-      try!(merge_tags(tags_kind, &tag_files, &tags_file));
+      try!(merge_tags(config, &tag_files, &tags_file));
    }
 
    if ! missing_sources.is_empty() {

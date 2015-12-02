@@ -7,6 +7,7 @@ use std::path::{PathBuf, Path};
 use app_result::{AppResult, app_err_msg, app_err_missing_src};
 use types::{Tags, TagsKind, SourceKind};
 use path_ext::PathExt;
+use config::Config;
 
 use dirs::{
    rusty_tags_cache_dir,
@@ -17,15 +18,15 @@ use dirs::{
 
 /// Checks if there's already a tags file for `source`
 /// and if not it's creating a new tags file and returning it.
-pub fn update_tags(tags_kind: &TagsKind, source: &SourceKind) -> AppResult<Tags>
+pub fn update_tags(config: &Config, source: &SourceKind) -> AppResult<Tags>
 {
-   let src_tags = try!(cached_tags_file(tags_kind, source));
+   let src_tags = try!(cached_tags_file(&config.tags_kind, source));
    let src_dir = try!(find_src_dir(source));
-   if src_tags.as_path().is_file() {
+   if src_tags.as_path().is_file() && ! config.force_recreate {
       return Ok(Tags::new(&src_dir, &src_tags, true));
    }
 
-   try!(create_tags(tags_kind, &src_dir, &src_tags));
+   try!(create_tags(config, &src_dir, &src_tags));
    Ok(Tags::new(&src_dir, &src_tags, false))
 }
 
@@ -33,12 +34,12 @@ pub fn update_tags(tags_kind: &TagsKind, source: &SourceKind) -> AppResult<Tags>
 /// file of the library has public reexports of external crates. If
 /// that's the case, then the tags of the public reexported external
 /// crates are merged into the tags of the library.
-pub fn update_tags_and_check_for_reexports(tags_kind: &TagsKind,
+pub fn update_tags_and_check_for_reexports(config: &Config,
                                            source: &SourceKind,
                                            dependencies: &Vec<SourceKind>) -> AppResult<Tags>
 {
-   let lib_tags = try!(update_tags(tags_kind, source));
-   if lib_tags.is_up_to_date(tags_kind) {
+   let lib_tags = try!(update_tags(config, source));
+   if lib_tags.is_up_to_date(&config.tags_kind) && ! config.force_recreate {
       return Ok(lib_tags);
    }
 
@@ -56,7 +57,7 @@ pub fn update_tags_and_check_for_reexports(tags_kind: &TagsKind,
    let mut crate_tags = Vec::<PathBuf>::new();
    for rcrate in reexp_crates.iter() {
       if let Some(crate_dep) = dependencies.iter().find(|d| d.get_lib_name() == *rcrate) {
-         crate_tags.push(try!(update_tags(tags_kind, crate_dep)).tags_file.clone());
+         crate_tags.push(try!(update_tags(config, crate_dep)).tags_file.clone());
       }
    }
 
@@ -65,12 +66,12 @@ pub fn update_tags_and_check_for_reexports(tags_kind: &TagsKind,
    }
 
    crate_tags.push(lib_tags.tags_file.clone());
-   try!(merge_tags(tags_kind, &crate_tags, &lib_tags.tags_file));
+   try!(merge_tags(config, &crate_tags, &lib_tags.tags_file));
    Ok(lib_tags)
 }
 
 /// merges `tag_files` into `into_tag_file`
-pub fn merge_tags(tags_kind: &TagsKind, tag_files: &Vec<PathBuf>, into_tag_file: &Path) -> AppResult<()>
+pub fn merge_tags(config: &Config, tag_files: &Vec<PathBuf>, into_tag_file: &Path) -> AppResult<()>
 {
    println!("Merging ...\n   tags:");
 
@@ -80,7 +81,7 @@ pub fn merge_tags(tags_kind: &TagsKind, tag_files: &Vec<PathBuf>, into_tag_file:
 
    println!("\n   into:\n      {}\n", into_tag_file.display());
 
-   match *tags_kind {
+   match config.tags_kind {
       TagsKind::Vi => {
          let mut file_contents: Vec<String> = Vec::new();
          for file in tag_files.iter() {
@@ -144,11 +145,11 @@ pub fn merge_tags(tags_kind: &TagsKind, tag_files: &Vec<PathBuf>, into_tag_file:
 
 /// creates tags recursive for the directory hierarchy starting at `src_dir`
 /// and writes them to `tags_file`
-pub fn create_tags(tags_kind: &TagsKind, src_dir: &Path, tags_file: &Path) -> AppResult<()>
+pub fn create_tags(config: &Config, src_dir: &Path, tags_file: &Path) -> AppResult<()>
 {
    let mut cmd = Command::new("ctags");
 
-   tags_kind.ctags_option().map(|opt| { cmd.arg(opt); () });
+   config.tags_kind.ctags_option().map(|opt| { cmd.arg(opt); () });
 
    cmd.arg("--recurse")
       .arg("--languages=Rust")
