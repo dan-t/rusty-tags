@@ -29,7 +29,7 @@ use tags::{
 };
 
 use dirs::rusty_tags_dir;
-use config::{get_config_from_args, Config};
+use config::Config;
 
 mod app_result;
 mod dependencies;
@@ -41,7 +41,7 @@ mod config;
 
 fn main() 
 {
-   let config = get_config_from_args();
+   let config = Config::from_command_args();
 
    update_all_tags(&config).unwrap_or_else(|err| {
       writeln!(&mut io::stderr(), "{}", err).unwrap();
@@ -51,7 +51,7 @@ fn main()
 
 fn update_all_tags(config: &Config) -> AppResult<()>
 {
-   try!(fetch_source_of_dependencies());
+   try!(fetch_source_of_dependencies(config));
 
    let cwd = try!(env::current_dir());
    let cargo_dir = try!(find_cargo_toml_dir(&cwd));
@@ -141,24 +141,28 @@ fn update_all_tags(config: &Config) -> AppResult<()>
       try!(merge_tags(config, &tag_files, &tags_file));
    }
 
-   if ! missing_sources.is_empty() {
-      println!("Couldn't find source code of dependencies:");
-      for src in missing_sources.iter() {
-         println!("   {}", src);
-      }
+   if ! config.quiet {
+      if ! missing_sources.is_empty() {
+         println!("Couldn't find source code of dependencies:");
+         for src in missing_sources.iter() {
+            println!("   {}", src);
+         }
 
-      println!("
+         println!("
 The dependencies might be platform specific and not needed on your current platform.
 You might try calling 'cargo fetch' by hand again.
 ");
+      }
    }
 
    Ok(())
 }
 
-fn fetch_source_of_dependencies() -> AppResult<()>
+fn fetch_source_of_dependencies(config: &Config) -> AppResult<()>
 {
-   println!("Fetching source of dependencies ...");
+   if ! config.quiet {
+      println!("Fetching source of dependencies ...");
+   }
 
    let mut cmd = Command::new("cargo");
    cmd.arg("fetch");

@@ -48,11 +48,13 @@ pub fn update_tags_and_check_for_reexports(config: &Config,
       return Ok(lib_tags);
    }
 
-   println!("Found public reexports in '{}' of:", source.get_lib_name());
-   for rcrate in reexp_crates.iter() {
-      println!("   {}", rcrate);
+   if config.verbose {
+      println!("Found public reexports in '{}' of:", source.get_lib_name());
+      for rcrate in reexp_crates.iter() {
+         println!("   {}", rcrate);
+      }
+      println!("");
    }
-   println!("");
 
    let mut crate_tags = Vec::<PathBuf>::new();
    for rcrate in reexp_crates.iter() {
@@ -73,13 +75,15 @@ pub fn update_tags_and_check_for_reexports(config: &Config,
 /// merges `tag_files` into `into_tag_file`
 pub fn merge_tags(config: &Config, tag_files: &Vec<PathBuf>, into_tag_file: &Path) -> AppResult<()>
 {
-   println!("Merging ...\n   tags:");
+   if config.verbose {
+      println!("Merging ...\n   tags:");
 
-   for file in tag_files.iter() {
-      println!("      {}", file.display());
+      for file in tag_files.iter() {
+         println!("      {}", file.display());
+      }
+
+      println!("\n   into:\n      {}\n", into_tag_file.display());
    }
-
-   println!("\n   into:\n      {}\n", into_tag_file.display());
 
    match config.tags_kind {
       TagsKind::Vi => {
@@ -168,8 +172,10 @@ pub fn create_tags(config: &Config, src_dir: &Path, tags_file: &Path) -> AppResu
       .arg(tags_file)
       .arg(src_dir);
 
-   println!("Creating tags ...\n   for source:\n      {}\n\n   cached at:\n      {}\n",
-            src_dir.display(), tags_file.display());
+   if config.verbose {
+      println!("Creating tags ...\n   for source:\n      {}\n\n   cached at:\n      {}\n",
+               src_dir.display(), tags_file.display());
+   }
 
    try!(cmd.output());
    Ok(())
