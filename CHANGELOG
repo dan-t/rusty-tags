@@ -1,3 +1,7 @@
+0.6.5
+-----
+* Add '--verbose' and '--quiet' options
+
 0.6.4
 -----
 * Add option --force-recreate
