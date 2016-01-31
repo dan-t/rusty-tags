@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::io::Read;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use toml;
 
 use app_result::{AppResult, app_err_msg};
@@ -78,30 +78,40 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
    let mut lib_src_kinds: Vec<SourceKind> = Vec::new();
    for (lib_name, value) in deps_table.iter() {
       match *value {
-         // handling of git and crates.io dependencies
+         // handling crates.io dependencies with a version
          toml::Value::String(_) => {
-            let lib_package = try!(find_package(&packages, &lib_name));
-            lib_src_kinds.push(try!(get_source_kind(lib_package, &lib_name)));
+            lib_src_kinds.push(try!(get_source_kind_of_lib(lib_name, &packages)));
          }
 
-         // handling of local path dependencies
+         // handling of table dependencies
          toml::Value::Table(ref table) => {
-            let mut path = try!(
-               table.get("path")
-                  .ok_or_else(|| { app_err_msg(format!("Couldn't get 'path' entry from '{}'", value)) })
-                  .and_then(|v| { v.as_str().ok_or_else(|| {
+            // handling of local path dependencies
+            if let Some(path) = table.get("path") {
+               let mut path = try!(
+                  path.as_str().ok_or_else(|| {
                      app_err_msg(format!("Expected a String for 'path' entry in '{}'", value))
-                  })})
-                  .map(|s| Path::new(s).to_path_buf())
-            );
+                  })
+                  .map(PathBuf::from)
+                  );
 
-            if path.is_relative() {
-               let mut abs_path = cargo_toml_dir.to_path_buf();
-               abs_path.push(path);
-               path = abs_path;
+               if path.is_relative() {
+                  let mut abs_path = cargo_toml_dir.to_path_buf();
+                  abs_path.push(path);
+                  path = abs_path;
+               }
+
+               lib_src_kinds.push(SourceKind::Path { lib_name: lib_name.clone(), path: path });
             }
-
-            lib_src_kinds.push(SourceKind::Path { lib_name: lib_name.clone(), path: path });
+            // handling of git and crates.io dependencies (may have additional parameters set:
+            // optional, etc.)
+            else if table.get("version").is_some() || table.get("git").is_some() {
+               lib_src_kinds.push(try!(get_source_kind_of_lib(lib_name, &packages)));
+            }
+            else {
+               return Err(app_err_msg(format!(
+                  "Couldn't find a path, version, or git attribute for {}", lib_name
+               )));
+            }
          }
 
          _ => {
@@ -208,4 +218,10 @@ fn parse_toml(path: &Path) -> AppResult<toml::Table>
    try!(file.read_to_string(&mut string));
    let mut parser = toml::Parser::new(&string);
    parser.parse().ok_or_else(|| app_err_msg(format!("Couldn't parse '{}': {:?}", path.display(), parser.errors)))
+}
+
+fn get_source_kind_of_lib(lib_name: &str, packages: &Vec<&toml::Table>) -> AppResult<SourceKind>
+{
+   let lib_package = try!(find_package(packages, lib_name));
+   get_source_kind(lib_package, lib_name)
 }
