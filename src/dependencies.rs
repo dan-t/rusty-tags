@@ -11,6 +11,10 @@ use types::{
    SourceKind
 };
 
+const DEP_STR: &'static str = "dependencies";
+const BUILD_DEP_STR: &'static str = "build-dependencies";
+const DEV_DEP_STR: &'static str = "dev-dependencies";
+
 /// Reads the dependencies from the `Cargo.toml` located in `cargo_toml_dir`
 pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
 {
@@ -26,13 +30,21 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
       return Ok(tags_roots);
    }
 
-   let deps_table = try!(
-      toml_table.get("dependencies")
-         .and_then(toml::Value::as_table)
-         .ok_or(app_err_msg(format!("Couldn't get toml::Table entry for 'dependency'!")))
-   );
 
-   if deps_table.is_empty() {
+   let mut deps_tables = Vec::with_capacity(3);
+   deps_tables.push(try!(
+      toml_table.get(DEP_STR)
+         .and_then(toml::Value::as_table)
+         .ok_or(app_err_msg(format!("Couldn't get toml::Table entry for '{}'!", DEP_STR)))
+   ));
+
+   for dep_type in &[DEV_DEP_STR, BUILD_DEP_STR] {
+      if let Some(t) = toml_table.get(*dep_type) {
+         deps_tables.push(try!(t.as_table().ok_or(app_err_msg(format!("Couldn't get toml::Table entry for '{}'!", dep_type)))));
+      }
+   }
+
+   if deps_tables.is_empty() {
       tags_roots.push(TagsRoot::Src { src_dir: cargo_toml_dir.to_path_buf(), dependencies: Vec::new() });
       return Ok(tags_roots);
    }
@@ -76,48 +88,50 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
    }
 
    let mut lib_src_kinds: Vec<SourceKind> = Vec::new();
-   for (lib_name, value) in deps_table.iter() {
-      match *value {
-         // handling crates.io dependencies with a version
-         toml::Value::String(_) => {
-            lib_src_kinds.push(try!(get_source_kind_of_lib(lib_name, &packages)));
-         }
-
-         // handling of table dependencies
-         toml::Value::Table(ref table) => {
-            // handling of local path dependencies
-            if let Some(path) = table.get("path") {
-               let mut path = try!(
-                  path.as_str().ok_or_else(|| {
-                     app_err_msg(format!("Expected a String for 'path' entry in '{}'", value))
-                  })
-                  .map(PathBuf::from)
-                  );
-
-               if path.is_relative() {
-                  let mut abs_path = cargo_toml_dir.to_path_buf();
-                  abs_path.push(path);
-                  path = abs_path;
-               }
-
-               lib_src_kinds.push(SourceKind::Path { lib_name: lib_name.clone(), path: path });
-            }
-            // handling of git and crates.io dependencies (may have additional parameters set:
-            // optional, etc.)
-            else if table.get("version").is_some() || table.get("git").is_some() {
+   for deps_table in deps_tables {
+      for (lib_name, value) in deps_table {
+         match *value {
+            // handling crates.io dependencies with a version
+            toml::Value::String(_) => {
                lib_src_kinds.push(try!(get_source_kind_of_lib(lib_name, &packages)));
             }
-            else {
+
+            // handling of table dependencies
+            toml::Value::Table(ref table) => {
+               // handling of local path dependencies
+               if let Some(path) = table.get("path") {
+                  let mut path = try!(
+                     path.as_str().ok_or_else(|| {
+                        app_err_msg(format!("Expected a String for 'path' entry in '{}'", value))
+                     })
+                     .map(PathBuf::from)
+                     );
+
+                  if path.is_relative() {
+                     let mut abs_path = cargo_toml_dir.to_path_buf();
+                     abs_path.push(path);
+                     path = abs_path;
+                  }
+
+                  lib_src_kinds.push(SourceKind::Path { lib_name: lib_name.clone(), path: path });
+               }
+               // handling of git and crates.io dependencies (may have additional parameters set:
+               // optional, etc.)
+               else if table.get("version").is_some() || table.get("git").is_some() {
+                  lib_src_kinds.push(try!(get_source_kind_of_lib(lib_name, &packages)));
+               }
+               else {
+                  return Err(app_err_msg(format!(
+                     "Couldn't find a path, version, or git attribute for {}", lib_name
+                  )));
+               }
+            }
+
+            _ => {
                return Err(app_err_msg(format!(
-                  "Couldn't find a path, version, or git attribute for {}", lib_name
+                  "Expected a String or a Table for the dependency with the name '{}', but got: '{}'", lib_name, value
                )));
             }
-         }
-
-         _ => {
-            return Err(app_err_msg(format!(
-               "Expected a String or a Table for the dependency with the name '{}', but got: '{}'", lib_name, value
-            )));
          }
       }
    }
