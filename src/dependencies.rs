@@ -93,7 +93,8 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
          match *value {
             // handling crates.io dependencies with a version
             toml::Value::String(_) => {
-               lib_src_kinds.push(try!(get_source_kind_of_lib(lib_name, &packages)));
+               let pkg = try!(find_package(&packages, lib_name));
+               lib_src_kinds.push(try!(get_source_kind(pkg, lib_name)));
             }
 
             // handling of table dependencies
@@ -118,7 +119,8 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
                // handling of git and crates.io dependencies (may have additional parameters set:
                // optional, etc.)
                else if table.get("version").is_some() || table.get("git").is_some() {
-                  lib_src_kinds.push(try!(get_source_kind_of_lib(lib_name, &packages)));
+                  let pkg = try!(find_package(&packages, lib_name));
+                  lib_src_kinds.push(try!(get_source_kind(pkg, lib_name)));
                }
                else {
                   return Err(app_err_msg(format!(
@@ -232,10 +234,4 @@ fn parse_toml(path: &Path) -> AppResult<toml::Table>
    try!(file.read_to_string(&mut string));
    let mut parser = toml::Parser::new(&string);
    parser.parse().ok_or_else(|| app_err_msg(format!("Couldn't parse '{}': {:?}", path.display(), parser.errors)))
-}
-
-fn get_source_kind_of_lib(lib_name: &str, packages: &Vec<&toml::Table>) -> AppResult<SourceKind>
-{
-   let lib_package = try!(find_package(packages, lib_name));
-   get_source_kind(lib_package, lib_name)
 }
