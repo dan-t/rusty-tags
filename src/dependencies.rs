@@ -106,7 +106,7 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
                         app_err_msg(format!("Expected a String for 'path' entry in '{}'", value))
                      })
                      .map(PathBuf::from)
-                     );
+                  );
 
                   if path.is_relative() {
                      let mut abs_path = cargo_toml_dir.to_path_buf();
@@ -124,7 +124,7 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
                }
                else {
                   return Err(app_err_msg(format!(
-                     "Couldn't find a path, version, or git attribute for {}", lib_name
+                     "Couldn't find a 'path', 'version' or 'git' attribute for '{}' in '{}'", lib_name, value
                   )));
                }
             }
