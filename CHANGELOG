@@ -1,3 +1,8 @@
+0.6.6
+-----
+* Support dev/build dependencies
+* More complete support of dependency definitions in 'Cargo.toml'
+
 0.6.5
 -----
 * Add '--verbose' and '--quiet' options
