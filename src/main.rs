@@ -11,7 +11,6 @@ extern crate clap;
 extern crate lazy_static;
 
 use std::fs;
-use std::env;
 use std::path::{PathBuf, Path};
 use std::io::{self, Write};
 use std::process::Command;
@@ -41,20 +40,23 @@ mod config;
 
 fn main() 
 {
-   let config = Config::from_command_args();
-
-   update_all_tags(&config).unwrap_or_else(|err| {
+   execute().unwrap_or_else(|err| {
       writeln!(&mut io::stderr(), "{}", err).unwrap();
       std::process::exit(1);
    });
+}
+
+fn execute() -> AppResult<()>
+{
+   let config = try!(Config::from_command_args());
+   update_all_tags(&config)
 }
 
 fn update_all_tags(config: &Config) -> AppResult<()>
 {
    try!(fetch_source_of_dependencies(config));
 
-   let cwd = try!(env::current_dir());
-   let cargo_dir = try!(find_cargo_toml_dir(&cwd));
+   let cargo_dir = try!(find_cargo_toml_dir(&config.start_dir));
    let tags_roots = try!(read_dependencies(&cargo_dir));
 
    let rust_std_lib_tags_file = try!(rust_std_lib_tags_file(&config.tags_kind));
