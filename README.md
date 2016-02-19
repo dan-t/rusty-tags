@@ -73,8 +73,8 @@ Vim Configuration
 
 Put this into your `~/.vim/after/ftplugin/rust.vim` file:
 
-    setlocal tags=rusty-tags.vi;/,path-to-rust-source-code/rusty-tags.vi
-    autocmd BufWrite *.rs :silent !rusty-tags vi
+    setlocal tags=./rusty-tags.vi;/,path-to-rust-source-code/rusty-tags.vi
+    autocmd BufWrite *.rs :silent exec "!rusty-tags vi --start-dir=" . expand('%:p:h') . "&"
 
 The first line (only supported by vim >= 7.4) ensures that vim will
 automatically search for a `rusty-tags.vi` file upwards the directory hierarchy.
@@ -83,14 +83,6 @@ This tags setting is important if you want to jump to dependencies and
 then further jump to theirs dependencies.
 
 The second line ensures that your projects tag file gets updated if a file is written.
-
-Normally you want to call the `rusty-tags` command in the backgroud by adding a `&`:
-
-    autocmd BufWrite *.rs :silent !rusty-tags vi &
-
-But I had sometimes strange behaviours this way that I couldn't track down
-until now. So you can try using it with the `&`, and if it doesn't work,
-if the tags aren't correctly updated, then you know the reason.
 
 MacOS Issues
 ============
