@@ -1,3 +1,7 @@
+0.6.8
+-----
+* Add '--start-dir' option
+
 0.6.6
 -----
 * Support dev/build dependencies
