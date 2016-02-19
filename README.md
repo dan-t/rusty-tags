@@ -82,11 +82,11 @@ automatically search for a `rusty-tags.vi` file upwards the directory hierarchy.
 This tags setting is important if you want to jump to dependencies and
 then further jump to theirs dependencies.
 
+The second line ensures that your projects tag file gets updated if a file is written.
+
 If you've created tags for the rust standard library, then add them like:
 
     setlocal tags=./rusty-tags.vi;/,path-to-rust-source-code/rusty-tags.vi
-
-The second line ensures that your projects tag file gets updated if a file is written.
 
 MacOS Issues
 ============
