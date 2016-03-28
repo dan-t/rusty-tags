@@ -11,10 +11,6 @@ use types::{
    SourceKind
 };
 
-const DEP_STR: &'static str = "dependencies";
-const BUILD_DEP_STR: &'static str = "build-dependencies";
-const DEV_DEP_STR: &'static str = "dev-dependencies";
-
 /// Reads the dependencies from the `Cargo.toml` located in `cargo_toml_dir`
 pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
 {
@@ -25,26 +21,8 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
    };
 
    let mut tags_roots: TagsRoots = Vec::new();
-   if ! toml_table.contains_key("dependencies") {
-      tags_roots.push(TagsRoot::Src { src_dir: cargo_toml_dir.to_path_buf(), dependencies: Vec::new() });
-      return Ok(tags_roots);
-   }
-
-
-   let mut deps_tables = Vec::with_capacity(3);
-   deps_tables.push(try!(
-      toml_table.get(DEP_STR)
-         .and_then(toml::Value::as_table)
-         .ok_or(app_err_msg(format!("Couldn't get toml::Table entry for '{}'!", DEP_STR)))
-   ));
-
-   for dep_type in &[DEV_DEP_STR, BUILD_DEP_STR] {
-      if let Some(t) = toml_table.get(*dep_type) {
-         deps_tables.push(try!(t.as_table().ok_or(app_err_msg(format!("Couldn't get toml::Table entry for '{}'!", dep_type)))));
-      }
-   }
-
-   if deps_tables.is_empty() {
+   let deps = try!(collect_dependencies(&toml_table));
+   if deps.is_empty() {
       tags_roots.push(TagsRoot::Src { src_dir: cargo_toml_dir.to_path_buf(), dependencies: Vec::new() });
       return Ok(tags_roots);
    }
@@ -88,52 +66,50 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
    }
 
    let mut lib_src_kinds: Vec<SourceKind> = Vec::new();
-   for deps_table in deps_tables {
-      for (lib_name, value) in deps_table {
-         match *value {
-            // handling crates.io dependencies with a version
-            toml::Value::String(_) => {
+   for (lib_name, value) in deps {
+      match *value {
+         // handling crates.io dependencies with a version
+         toml::Value::String(_) => {
+            let pkg = try!(find_package(&packages, lib_name));
+            lib_src_kinds.push(try!(get_source_kind(pkg, lib_name)));
+         }
+
+         // handling of table dependencies
+         toml::Value::Table(ref table) => {
+            // handling of local path dependencies
+            if let Some(path) = table.get("path") {
+               let mut path = try!(
+                  path.as_str().ok_or_else(|| {
+                     app_err_msg(format!("Expected a String for 'path' entry in '{}'", value))
+                  })
+                  .map(PathBuf::from)
+               );
+
+               if path.is_relative() {
+                  let mut abs_path = cargo_toml_dir.to_path_buf();
+                  abs_path.push(path);
+                  path = abs_path;
+               }
+
+               lib_src_kinds.push(SourceKind::Path { lib_name: lib_name.clone(), path: path });
+            }
+            // handling of git and crates.io dependencies (may have additional parameters set:
+            // optional, etc.)
+            else if table.get("version").is_some() || table.get("git").is_some() {
                let pkg = try!(find_package(&packages, lib_name));
                lib_src_kinds.push(try!(get_source_kind(pkg, lib_name)));
             }
-
-            // handling of table dependencies
-            toml::Value::Table(ref table) => {
-               // handling of local path dependencies
-               if let Some(path) = table.get("path") {
-                  let mut path = try!(
-                     path.as_str().ok_or_else(|| {
-                        app_err_msg(format!("Expected a String for 'path' entry in '{}'", value))
-                     })
-                     .map(PathBuf::from)
-                  );
-
-                  if path.is_relative() {
-                     let mut abs_path = cargo_toml_dir.to_path_buf();
-                     abs_path.push(path);
-                     path = abs_path;
-                  }
-
-                  lib_src_kinds.push(SourceKind::Path { lib_name: lib_name.clone(), path: path });
-               }
-               // handling of git and crates.io dependencies (may have additional parameters set:
-               // optional, etc.)
-               else if table.get("version").is_some() || table.get("git").is_some() {
-                  let pkg = try!(find_package(&packages, lib_name));
-                  lib_src_kinds.push(try!(get_source_kind(pkg, lib_name)));
-               }
-               else {
-                  return Err(app_err_msg(format!(
-                     "Couldn't find a 'path', 'version' or 'git' attribute for '{}' in '{}'", lib_name, value
-                  )));
-               }
-            }
-
-            _ => {
+            else {
                return Err(app_err_msg(format!(
-                  "Expected a String or a Table for the dependency with the name '{}', but got: '{}'", lib_name, value
+                  "Couldn't find a 'path', 'version' or 'git' attribute for '{}' in '{}'", lib_name, value
                )));
             }
+         }
+
+         _ => {
+            return Err(app_err_msg(format!(
+               "Expected a String or a Table for the dependency with the name '{}', but got: '{}'", lib_name, value
+            )));
          }
       }
    }
@@ -182,6 +158,30 @@ fn get_source_kind(lib_package: &toml::Table, lib_name: &str) -> AppResult<Sourc
          Err(app_err_msg(format!("Unexpected source type '{}' in package: '{:?}'!", src_type, lib_package)))
       }
    }
+}
+
+/// the name of a dependency
+type DepName = String;
+
+/// Collects all dependencies specified in the `Cargo.toml`. The dependencies might
+/// be specified by `dependencies`, `build-dependencies` or `dev-dependencies`.
+fn collect_dependencies(cargo_toml: &toml::Table) -> AppResult<Vec<(&DepName, &toml::Value)>>
+{
+   let mut deps = Vec::with_capacity(50);
+   for dep_type in &["dependencies", "build-dependencies", "dev-dependencies"] {
+      if let Some(deps_value) = cargo_toml.get(*dep_type) {
+         let deps_table = try!(
+            deps_value.as_table()
+               .ok_or(app_err_msg(format!("Couldn't get toml::Table entry for '{}'! Got a '{}'!", dep_type, deps_value)))
+            );
+
+         for dep in deps_table {
+            deps.push(dep);
+         }
+      }
+   }
+
+   Ok(deps)
 }
 
 fn get_dependencies(lib_package: &toml::Table) -> AppResult<Vec<&str>>
