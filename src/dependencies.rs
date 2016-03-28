@@ -23,7 +23,7 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
    let mut tags_roots: TagsRoots = Vec::new();
    let deps = try!(collect_dependencies(&toml_table));
    if deps.is_empty() {
-      tags_roots.push(TagsRoot::Src { src_dir: cargo_toml_dir.to_path_buf(), dependencies: Vec::new() });
+      tags_roots.push(TagsRoot::Proj { src_dir: cargo_toml_dir.to_path_buf(), dependencies: Vec::new() });
       return Ok(tags_roots);
    }
 
@@ -114,7 +114,7 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<TagsRoots>
       }
    }
 
-   tags_roots.push(TagsRoot::Src { src_dir: cargo_toml_dir.to_path_buf(), dependencies: lib_src_kinds });
+   tags_roots.push(TagsRoot::Proj { src_dir: cargo_toml_dir.to_path_buf(), dependencies: lib_src_kinds });
 
    Ok(tags_roots)
 }

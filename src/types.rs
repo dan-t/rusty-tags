@@ -7,7 +7,7 @@ pub enum TagsRoot
 {
    /// the source directory and the dependencies
    /// of the cargo project
-   Src {
+   Proj {
       src_dir: PathBuf,
       dependencies: Vec<SourceKind>
    },
@@ -26,7 +26,7 @@ impl Debug for TagsRoot
    fn fmt(&self, f: &mut Formatter) -> Result<(), Error>
    {
       match *self {
-         TagsRoot::Src { ref src_dir, ref dependencies } => {
+         TagsRoot::Proj { ref src_dir, ref dependencies } => {
             write!(f, "Src ( src_dir: {}, dependencies: {:?} )", src_dir.display(), dependencies)
          },
 

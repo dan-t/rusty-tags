@@ -67,7 +67,7 @@ fn update_all_tags(config: &Config) -> AppResult<()>
       let mut tag_dir: Option<PathBuf> = None;
 
       match *tags_root {
-         TagsRoot::Src { ref src_dir, ref dependencies } => {
+         TagsRoot::Proj { ref src_dir, ref dependencies } => {
             let mut src_tags = src_dir.clone();
             src_tags.push(config.tags_kind.tags_file_name());
             try!(create_tags(config, src_dir, &src_tags));
