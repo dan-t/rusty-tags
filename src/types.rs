@@ -3,6 +3,16 @@ use std::path::PathBuf;
 
 use path_ext::PathExt;
 
+/// For every `TagsRoot` a `rusty-tags.{vi,emacs}` file will be created.
+///
+/// `Proj` is the tags root of the current cargo project. Its tags file will contain the tags of
+/// the source code of the cargo project and of its direct dependencies. The tags file will be
+/// placed at the root of the cargo project, beside of the `Cargo.toml`.
+///
+/// `Lib` represents a direct or indirect (a dependency of a dependency) dependency of the cargo
+/// project. For each dependency a tags file will be created containing the tags of the source
+/// code of the dependency and its direct dependecies. The tags file will be placed at the root of
+/// the source code of the dependency.
 pub enum TagsRoot
 {
    /// the source directory and the dependencies
@@ -12,7 +22,7 @@ pub enum TagsRoot
       dependencies: Vec<SourceKind>
    },
 
-   /// a library and its depedencies
+   /// a library and its dependencies
    Lib {
       src_kind: SourceKind,
       dependencies: Vec<SourceKind>
@@ -37,6 +47,8 @@ impl Debug for TagsRoot
    }
 }
 
+/// Where the source code of a dependency is from. From a git repository, from `crates.io` or from
+/// a local path.
 #[derive(Clone)]
 pub enum SourceKind
 {
