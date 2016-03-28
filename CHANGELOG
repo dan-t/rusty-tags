@@ -1,3 +1,7 @@
+0.7.0
+-----
+* Now really handle empty 'dependencies' in 'Cargo.toml'
+
 0.6.8
 -----
 * Add '--start-dir' option
