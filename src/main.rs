@@ -90,8 +90,7 @@ fn update_all_tags(config: &Config) -> AppResult<()> {
                     Ok(tags) => {
                         if tags.is_up_to_date(&config.tags_kind) && ! config.force_recreate {
                             continue;
-                        }
-                        else {
+                        } else {
                             tags
                         }
                     }
