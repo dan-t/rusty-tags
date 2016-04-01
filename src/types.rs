@@ -169,8 +169,7 @@ impl Debug for Tags {
 /// which kind of tags are created
 arg_enum! {
     #[derive(Eq, PartialEq, Debug)]
-    pub enum TagsKind
-    {
+    pub enum TagsKind {
         Vi,
         Emacs
     }
