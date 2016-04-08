@@ -14,10 +14,10 @@ use path_ext::PathExt;
 /// code of the dependency and its direct dependecies. The tags file will be placed at the root of
 /// the source code of the dependency.
 pub enum TagsRoot {
-    /// the source directory and the dependencies
-    /// of the cargo project
+    /// the root directory of the cargo project
+    /// and the dependencies of the cargo project
     Proj {
-        src_dir: PathBuf,
+        root_dir: PathBuf,
         dependencies: Vec<SourceKind>
     },
 
@@ -33,12 +33,12 @@ pub type TagsRoots = Vec<TagsRoot>;
 impl Debug for TagsRoot {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         match *self {
-            TagsRoot::Proj { ref src_dir, ref dependencies } => {
-                write!(f, "Src ( src_dir: {}, dependencies: {:?} )", src_dir.display(), dependencies)
+            TagsRoot::Proj { ref root_dir, ref dependencies } => {
+                write!(f, "TagsRoot::Proj ( root_dir: {}, dependencies: {:?} )", root_dir.display(), dependencies)
             },
 
             TagsRoot::Lib { ref src_kind, ref dependencies } => {
-                write!(f, "Lib ( src_kind: {}, dependencies: {:?} )", src_kind, dependencies)
+                write!(f, "TagsRoot::Lib ( src_kind: {}, dependencies: {:?} )", src_kind, dependencies)
             }
         }
     }

@@ -64,10 +64,13 @@ fn update_all_tags(config: &Config) -> AppResult<()> {
         let mut tag_dir: Option<PathBuf> = None;
 
         match *tags_root {
-            TagsRoot::Proj { ref src_dir, ref dependencies } => {
-                let mut src_tags = src_dir.clone();
+            TagsRoot::Proj { ref root_dir, ref dependencies } => {
+                let mut src_tags = root_dir.clone();
                 src_tags.push(config.tags_kind.tags_file_name());
-                try!(create_tags(config, src_dir, &src_tags));
+
+                let src_dir = root_dir.join("src");
+
+                try!(create_tags(config, &src_dir, &src_tags));
                 tag_files.push(src_tags);
 
                 for dep in dependencies.iter() {
@@ -82,7 +85,7 @@ fn update_all_tags(config: &Config) -> AppResult<()> {
                     }
                 }
 
-                tag_dir = Some(src_dir.clone());
+                tag_dir = Some(root_dir.clone());
             },
 
             TagsRoot::Lib { ref src_kind, ref dependencies } => {
