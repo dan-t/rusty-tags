@@ -134,6 +134,13 @@ fn cargo_dir_internal() -> AppResult<PathBuf> {
                 .map_err(|_| app_err_msg("Couldn't convert 'multirust show-override' output to utf8!".to_string()))
         );
 
+        // Make it compatible with 'rustup' which currently still installs
+        // a 'multirust' binary, but there's no 'cargo' directory anymore
+        // under the toolchain path.
+        //
+        // The downloaded sources of 'cargo' are now again under '~/.cargo/'.
+        let mut found_location_but_without_cargo_dir = false;
+
         for line in output.lines() {
             let strs: Vec<&str> = line.split(" location: ").collect();
             if strs.len() == 2 {
@@ -142,11 +149,16 @@ fn cargo_dir_internal() -> AppResult<PathBuf> {
                 path.push("cargo");
                 if path.is_dir() {
                     return Ok(path);
+                } else {
+                    found_location_but_without_cargo_dir = true;
+                    break;
                 }
             }
         }
 
-        return Err(app_err_msg(format!("Couldn't get multirust cargo location from output:\n{}", output)));
+        if ! found_location_but_without_cargo_dir {
+            return Err(app_err_msg(format!("Couldn't get multirust cargo location from output:\n{}", output)));
+        }
     }
 
     home_dir().map(|mut d| { d.push(".cargo"); d })
