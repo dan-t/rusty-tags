@@ -44,26 +44,11 @@ crates.io dependencies inside of `~/.cargo/registry/src/github.com-*`.
 Rust Standard Library Support
 =============================
 
-The source code of Rust already contains a script for creating tags, but
-if you only want to jump into the standard library then reducing the directories
-gives better results.
+`rusty-tags` will create tags for the standard library if you supply
+the rust source by defining the environment variable `$RUST_SRC_PATH`:
 
-First get the Rust source code:
-
-    $ git clone https://github.com/rust-lang/rust.git
-    $ cd rust
-
-And now execute the following script inside of the rust directory:
-
-    #!/usr/bin/env bash
-    
-    src_dirs=`echo $PWD/src/{liballoc,libarena,libbacktrace,libcollections,libcore,libflate,libfmt_macros,libgetopts,libgraphviz,liblog,librand,librbml,libserialize,libstd,libsyntax,libterm}`
-    
-    ctags -f rusty-tags.vi --options=src/etc/ctags.rust --languages=Rust --recurse $src_dirs
-    
-    ctags -e -f rusty-tags.emacs --options=src/etc/ctags.rust --languages=Rust --recurse $src_dirs
-
-Now add the created tags file to the list of tags files in your editor settings.
+    $ git clone https://github.com/rust-lang/rust.git /home/you/rust
+    $ export RUST_SRC_PATH=/home/you/rust/src/   # should be defined in your ~/.bashrc
 
 Vim Configuration
 =================
@@ -81,9 +66,9 @@ then further jump to theirs dependencies.
 
 The second line ensures that your projects tag file gets updated if a file is written.
 
-If you've created tags for the rust standard library, then add them like:
+If you've supplied the rust source code by defining `$RUST_SRC_PATH`:
 
-    setlocal tags=./rusty-tags.vi;/,path-to-rust-source-code/rusty-tags.vi
+    setlocal tags=./rusty-tags.vi;/,$RUST_SRC_PATH/rusty-tags.vi
 
 MacOS Issues
 ============
