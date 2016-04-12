@@ -26,7 +26,7 @@ pub fn update_tags(config: &Config, source: &SourceKind) -> AppResult<Tags> {
         return Ok(Tags::new(&src_dir, &src_tags, true));
     }
 
-    try!(create_tags(config, &src_dir, &src_tags));
+    try!(create_tags(config, &[&src_dir], &src_tags));
     Ok(Tags::new(&src_dir, &src_tags, false))
 }
 
@@ -146,9 +146,9 @@ pub fn merge_tags(config: &Config, tag_files: &Vec<PathBuf>, into_tag_file: &Pat
     Ok(())
 }
 
-/// creates tags recursive for the directory hierarchy starting at `src_dir`
+/// creates tags recursive for the directory hierarchy starting at `src_dirs`
 /// and writes them to `tags_file`
-pub fn create_tags(config: &Config, src_dir: &Path, tags_file: &Path) -> AppResult<()> {
+pub fn create_tags<P: AsRef<Path>>(config: &Config, src_dirs: &[P], tags_file: P) -> AppResult<()> {
     let mut cmd = Command::new("ctags");
 
     config.tags_kind.ctags_option().map(|opt| { cmd.arg(opt); () });
@@ -167,18 +167,25 @@ pub fn create_tags(config: &Config, src_dir: &Path, tags_file: &Path) -> AppResu
         .arg("--regex-Rust=/^[ \\t]*(pub[ \\t]+)?impl([ \\t\\n]*<[^>]*>)?[ \\t]+(([a-zA-Z0-9_:]+)[ \\t]*(<[^>]*>)?[ \\t]+(for)[ \\t]+)?([a-zA-Z0-9_]+)/\\4 \\6 \\7/i,impls,trait implementations/")
         .arg("--regex-Rust=/^[ \\t]*macro_rules![ \\t]+([a-zA-Z0-9_]+)/\\1/d,macros,macro definitions/")
         .arg("-o")
-        .arg(tags_file)
-        .arg(src_dir);
+        .arg(tags_file.as_ref());
+
+    for dir in src_dirs {
+        cmd.arg(dir.as_ref());
+    }
 
     if config.verbose {
-        println!("Creating tags ...\n   for source:\n      {}\n\n   cached at:\n      {}\n",
-                 src_dir.display(), tags_file.display());
+        println!("Creating tags ...\n   for source:");
+        for dir in src_dirs {
+            println!("      {}", dir.as_ref().display());
+        }
+
+        println!("\n   cached at:\n      {}\n", tags_file.as_ref().display());
     }
 
     try!(cmd.output());
 
     if config.tags_kind == TagsKind::Vi {
-        try!(vi_tag::sort_file(tags_file));
+        try!(vi_tag::sort_file(tags_file.as_ref()));
     }
 
     Ok(())

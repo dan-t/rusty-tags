@@ -15,10 +15,11 @@ use std::fs;
 use std::path::{PathBuf, Path};
 use std::io::{self, Write};
 use std::process::Command;
+use std::env;
 
 use app_result::{AppResult, AppErr, app_err_msg};
 use dependencies::read_dependencies;
-use types::{TagsRoot, TagsKind};
+use types::TagsRoot;
 use path_ext::PathExt;
 
 use tags::{
@@ -28,7 +29,6 @@ use tags::{
     merge_tags
 };
 
-use dirs::rusty_tags_dir;
 use config::Config;
 
 mod app_result;
@@ -55,13 +55,12 @@ fn execute() -> AppResult<()> {
 
 fn update_all_tags(config: &Config) -> AppResult<()> {
     try!(fetch_source_of_dependencies(config));
+    try!(update_std_lib_tags(&config));
 
     let cargo_dir = try!(find_cargo_toml_dir(&config.start_dir));
     let tags_roots = try!(read_dependencies(&cargo_dir));
 
-    let rust_std_lib_tags_file = try!(rust_std_lib_tags_file(&config.tags_kind));
     let mut missing_sources = Vec::new();
-
     for tags_root in tags_roots.iter() {
         let mut tag_files: Vec<PathBuf> = Vec::new();
         let mut tag_dir: Option<PathBuf> = None;
@@ -73,7 +72,7 @@ fn update_all_tags(config: &Config) -> AppResult<()> {
 
                 let src_dir = root_dir.join("src");
 
-                try!(create_tags(config, &src_dir, &src_tags));
+                try!(create_tags(config, &[&src_dir], &src_tags));
                 tag_files.push(src_tags);
 
                 for dep in dependencies.iter() {
@@ -135,10 +134,6 @@ fn update_all_tags(config: &Config) -> AppResult<()> {
             continue;
         }
 
-        if rust_std_lib_tags_file.as_path().is_file() {
-            tag_files.push(rust_std_lib_tags_file.clone());
-        }
-
         let mut tags_file = tag_dir.unwrap();
         tags_file.push(config.tags_kind.tags_file_name());
 
@@ -198,10 +193,50 @@ fn find_cargo_toml_dir(start_dir: &Path) -> AppResult<PathBuf> {
     }
 }
 
-/// the tags file containing the tags for the rust standard library
-fn rust_std_lib_tags_file(tags_kind: &TagsKind) -> AppResult<PathBuf> {
-    let mut tags_file = try!(rusty_tags_dir().map(Path::to_path_buf));
-    tags_file.push(&format!("rust-std-lib.{}", tags_kind.tags_file_extension()));
+fn update_std_lib_tags(config: &Config) -> AppResult<()> {
+    let src_path_str = env::var("RUST_SRC_PATH");
+    if ! src_path_str.is_ok() {
+        return Ok(());
+    }
 
-    Ok(tags_file)
+    let src_path_str = src_path_str.unwrap();
+    let src_path = Path::new(&src_path_str);
+    if ! src_path.is_dir() {
+        return Err(app_err_msg(format!("Missing rust source code at '{}'!", src_path.display())));
+    }
+
+    let tags_file = src_path.join(config.tags_kind.tags_file_name());
+    if tags_file.is_file() && ! config.force_recreate {
+        return Ok(());
+    }
+
+    let possible_src_dirs = [
+        "liballoc",
+        "libarena",
+        "libbacktrace",
+        "libcollections",
+        "libcore",
+        "libflate",
+        "libfmt_macros",
+        "libgetopts",
+        "libgraphviz",
+        "liblog",
+        "librand",
+        "librbml",
+        "libserialize",
+        "libstd",
+        "libsyntax",
+        "libterm"
+    ];
+
+    let mut src_dirs = Vec::new();
+    for dir in &possible_src_dirs {
+        let src_dir = src_path.join(&dir);
+        if src_dir.is_dir() {
+            src_dirs.push(src_dir);
+        }
+    }
+
+    try!(create_tags(&config, &src_dirs, tags_file));
+    Ok(())
 }
