@@ -1,3 +1,10 @@
+0.8.0
+-----
+* Build tags for rust standard library
+* Support 'rustup' beta
+* Remove tags creation for 'impl'
+* Only create tags for files under 'src' directory
+
 0.7.0
 -----
 * Now really handle empty 'dependencies' in 'Cargo.toml'
