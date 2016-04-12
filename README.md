@@ -16,12 +16,9 @@ Prerequisites
 Installation
 ============
 
-* get `rustc` and `cargo` from [here](<http://www.rust-lang.org/install.html>)
-* `git clone https://github.com/dan-t/rusty-tags.git`
-* `cd rusty-tags`
-* `cargo build --release`
+    $ cargo install rusty-tags
 
-The build binary will be located at `target/release/rusty-tags`.
+The build binary will be located at `~/.cargo/bin/rusty-tags`.
 
 Usage
 =====
