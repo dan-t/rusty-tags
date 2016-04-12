@@ -3,7 +3,6 @@
 
 extern crate toml;
 extern crate glob;
-extern crate regex;
 
 #[macro_use]
 extern crate clap;
@@ -38,8 +37,6 @@ mod tags;
 mod types;
 mod path_ext;
 mod config;
-mod vi_tag;
-mod utils;
 
 fn main() {
     execute().unwrap_or_else(|err| {

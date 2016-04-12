@@ -8,7 +8,7 @@ use types::SourceKind;
 pub type AppResult<T> = Result<T, AppErr>;
 
 /// The generic error used in the whole application.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum AppErr {
     /// generic error message
     Message(String),

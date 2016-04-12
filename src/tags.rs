@@ -8,7 +8,6 @@ use app_result::{AppResult, app_err_msg, app_err_missing_src};
 use types::{Tags, TagsKind, SourceKind};
 use path_ext::PathExt;
 use config::Config;
-use vi_tag;
 
 use dirs::{
     rusty_tags_cache_dir,
@@ -105,7 +104,7 @@ pub fn merge_tags(config: &Config, tag_files: &Vec<PathBuf>, into_tag_file: &Pat
                 }
             }
 
-            merged_lines = vi_tag::sort_lines(merged_lines);
+            merged_lines.sort();
             merged_lines.dedup();
 
             let mut tag_file = try!(
@@ -183,11 +182,6 @@ pub fn create_tags<P: AsRef<Path>>(config: &Config, src_dirs: &[P], tags_file: P
     }
 
     try!(cmd.output());
-
-    if config.tags_kind == TagsKind::Vi {
-        try!(vi_tag::sort_file(tags_file.as_ref()));
-    }
-
     Ok(())
 }
 
