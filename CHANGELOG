@@ -1,3 +1,7 @@
+0.8.1
+-----
+* Only create tags for module definitions
+
 0.8.0
 -----
 * Build tags for rust standard library
