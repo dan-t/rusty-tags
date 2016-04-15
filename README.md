@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.org/dan-t/rusty-tags.svg?branch=master)](https://travis-ci.org/dan-t/rusty-tags)
+[![](http://meritbadge.herokuapp.com/rusty-tags)](https://crates.io/crates/rusty-tags)
 
 rusty-tags
 ==========
