@@ -1,3 +1,7 @@
+0.8.2
+-----
+* Support CARGO_HOME environment variable
+
 0.8.1
 -----
 * Only create tags for module definitions
