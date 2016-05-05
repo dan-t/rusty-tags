@@ -161,5 +161,9 @@ fn cargo_dir_internal() -> AppResult<PathBuf> {
         }
     }
 
-    home_dir().map(|mut d| { d.push(".cargo"); d })
+    if let Ok(d) = env::var("CARGO_HOME") {
+        Ok(PathBuf::from(d))
+    } else {
+        home_dir().map(|mut d| { d.push(".cargo"); d })
+    }
 }
