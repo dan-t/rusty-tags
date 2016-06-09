@@ -49,6 +49,8 @@ Rust Standard Library Support
 the rust source by defining the environment variable `$RUST_SRC_PATH`:
 
     $ git clone https://github.com/rust-lang/rust.git /home/you/rust
+    $ cd /home/you/rust
+    $ git checkout stable
     $ export RUST_SRC_PATH=/home/you/rust/src/   # should be defined in your ~/.bashrc
 
 Vim Configuration
