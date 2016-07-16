@@ -5,7 +5,6 @@ use std::process::Command;
 use glob::{glob, Paths};
 
 use app_result::{AppResult, app_err_msg};
-use path_ext::PathExt;
 
 lazy_static! {
     static ref HOME_DIR               : AppResult<PathBuf> = home_dir_internal();

@@ -6,7 +6,6 @@ use std::path::{PathBuf, Path};
 
 use app_result::{AppResult, app_err_msg, app_err_missing_src};
 use types::{Tags, TagsKind, SourceKind};
-use path_ext::PathExt;
 use config::Config;
 
 use dirs::{

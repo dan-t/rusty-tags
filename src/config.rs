@@ -3,7 +3,6 @@ use std::path::PathBuf;
 use clap::{App, Arg};
 use types::TagsKind;
 use app_result::{AppResult, app_err_msg};
-use path_ext::PathExt;
 
 /// the configuration used to run rusty-tags
 pub struct Config {

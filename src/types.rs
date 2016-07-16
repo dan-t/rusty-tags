@@ -1,8 +1,6 @@
 use std::fmt::{Debug, Display, Formatter, Error};
 use std::path::PathBuf;
 
-use path_ext::PathExt;
-
 /// For every `TagsRoot` a `rusty-tags.{vi,emacs}` file will be created.
 ///
 /// `Proj` is the tags root of the current cargo project. Its tags file will contain the tags of

@@ -19,7 +19,6 @@ use std::env;
 use app_result::{AppResult, AppErr, app_err_msg};
 use dependencies::read_dependencies;
 use types::TagsRoot;
-use path_ext::PathExt;
 
 use tags::{
     update_tags,
@@ -35,7 +34,6 @@ mod dependencies;
 mod dirs;
 mod tags;
 mod types;
-mod path_ext;
 mod config;
 
 fn main() {
