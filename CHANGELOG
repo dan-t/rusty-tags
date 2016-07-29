@@ -1,3 +1,7 @@
+0.9.1
+-----
+* Better handling of failed ctags execution
+
 0.9.0
 -----
 * Now needs at least rust 1.5 for building

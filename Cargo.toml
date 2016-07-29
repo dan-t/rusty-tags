@@ -1,7 +1,7 @@
 [package]
 
 name = "rusty-tags"
-version = "0.9.0"
+version = "0.9.1"
 authors = ["Daniel Trstenjak <daniel.trstenjak@gmail.com>"]
 license = "BSD-3-Clause"
 description = "Create ctags/etags for a cargo project and all of its dependencies"
