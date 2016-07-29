@@ -179,7 +179,20 @@ pub fn create_tags<P: AsRef<Path>>(config: &Config, src_dirs: &[P], tags_file: P
         println!("\n   cached at:\n      {}\n", tags_file.as_ref().display());
     }
 
-    try!(cmd.output());
+    let output = try!(cmd.output());
+    if ! output.status.success() {
+        let mut msg = String::from_utf8_lossy(&output.stderr).into_owned();
+        if msg.is_empty() {
+            msg = String::from_utf8_lossy(&output.stdout).into_owned();
+        }
+
+        if msg.is_empty() {
+            msg = "ctags execution failed without any stderr or stdout output".to_string();
+        }
+
+        return Err(app_err_msg(msg));
+    }
+
     Ok(())
 }
 
