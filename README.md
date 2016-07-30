@@ -11,7 +11,7 @@ of its dependencies.
 Prerequisites
 =============
 
-* [ctags](<http://ctags.sourceforge.net>) installed
+* [ctags](<http://ctags.sourceforge.net>) installed, needs a version with the `--recurse` flag
 * [git](<http://git-scm.com/>) installed if git dependencies are used
 
 Installation
