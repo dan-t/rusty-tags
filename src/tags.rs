@@ -179,7 +179,9 @@ pub fn create_tags<P: AsRef<Path>>(config: &Config, src_dirs: &[P], tags_file: P
         println!("\n   cached at:\n      {}\n", tags_file.as_ref().display());
     }
 
-    let output = try!(cmd.output());
+    let output = try!(cmd.output()
+        .map_err(|err| app_err_msg(format!("ctags execution failed: {}", err))));
+
     if ! output.status.success() {
         let mut msg = String::from_utf8_lossy(&output.stderr).into_owned();
         if msg.is_empty() {
@@ -354,7 +356,9 @@ fn get_commit_hash(git_dir: &Path) -> AppResult<String> {
         .arg("rev-parse")
         .arg("HEAD");
 
-    let out = try!(cmd.output());
+    let out = try!(cmd.output()
+        .map_err(|err| app_err_msg(format!("git execution failed: {}", err))));
+
     String::from_utf8(out.stdout)
         .map(|s| s.trim().to_string())
         .map_err(|_| app_err_msg("Couldn't convert 'git rev-parse HEAD' output to utf8!".to_string()))
