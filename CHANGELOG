@@ -1,3 +1,7 @@
+0.9.2
+-----
+* Better error messages for failed executions of ctags/git
+
 0.9.1
 -----
 * Better handling of failed ctags execution
