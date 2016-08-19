@@ -29,7 +29,7 @@ impl Config {
        let matches = App::new("rusty-tags")
            .about("Create ctags/etags for a cargo project and all of its dependencies")
            // Pull version from Cargo.toml
-           .version(&*format!("v{}", crate_version!()))
+           .version(crate_version!())
            .author("Daniel Trstenjak <daniel.trstenjak@gmail.com>")
            .arg_from_usage("<TAGS_KIND> 'The kind of the created tags (vi, emacs)'")
            .arg(Arg::with_name("start-dir")
