@@ -53,6 +53,17 @@ the rust source by defining the environment variable `$RUST_SRC_PATH`:
     $ git checkout stable
     $ export RUST_SRC_PATH=/home/you/rust/src/   # should be defined in your ~/.bashrc
 
+Configuration
+=============
+
+The current supported configuration at `~/.rusty-tags/config.toml` (defaults displayed):
+
+    # the file name used for vi tags
+    vi_tags = "rusty-tags.vi"
+
+    # the file name used for emacs tags
+    emacs_tags = "rusty-tags.emacs"
+
 Vim Configuration
 =================
 
