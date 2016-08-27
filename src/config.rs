@@ -1,8 +1,13 @@
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::fs::File;
+use std::io::Read;
 use clap::{App, Arg};
+use toml;
+use rustc_serialize::Decodable;
 use types::{TagsKind, TagsSpec};
 use app_result::{AppResult, app_err_msg};
+use dirs;
 
 /// the configuration used to run rusty-tags
 pub struct Config {
@@ -52,12 +57,68 @@ impl Config {
        let quiet = matches.is_present("quiet");
        let kind = value_t_or_exit!(matches.value_of("TAGS_KIND"), TagsKind);
 
+       let (vi_tags, emacs_tags) = {
+           let mut vt = "rusty-tags.vi".to_string();
+           let mut et = "rusty-tags.emacs".to_string();
+           if let Some(file_config) = try!(ConfigFromFile::load()) {
+               if let Some(fcvt) = file_config.vi_tags { vt = fcvt; }
+               if let Some(fcet) = file_config.emacs_tags { et = fcet; }
+           }
+
+           (vt, et)
+       };
+
        Ok(Config {
-           tags_spec: TagsSpec::new(kind, "rusty-tags.vi".to_string(), "rusty-tags.emacs".to_string()),
+           tags_spec: try!(TagsSpec::new(kind, vi_tags, emacs_tags)),
            start_dir: start_dir,
            force_recreate: matches.is_present("force-recreate"),
            verbose: if quiet { false } else { matches.is_present("verbose") },
            quiet: quiet
        })
    }
+}
+
+/// Represents the data from a `.rusty-tags/config.toml` configuration file.
+#[derive(RustcDecodable, Debug, Default)]
+struct ConfigFromFile {
+    /// the file name used for vi tags
+    vi_tags: Option<String>,
+
+    /// the file name used for emacs tags
+    emacs_tags: Option<String>,
+}
+
+impl ConfigFromFile {
+    fn load() -> AppResult<Option<ConfigFromFile>> {
+        let config_file = try!(dirs::rusty_tags_dir().map(|p| p.join("config.toml")));
+        if ! config_file.is_file() {
+            return Ok(None);
+        }
+
+        let config = try!(map_file(&config_file, |contents| {
+            let mut parser = toml::Parser::new(&contents);
+            let value = try!(parser.parse()
+                .ok_or_else(|| app_err_msg(format!("Couldn't parse toml file '{}': {:?}",
+                                                   config_file.display(), parser.errors))));
+
+            let mut decoder = toml::Decoder::new(toml::Value::Table(value));
+            Ok(try!(ConfigFromFile::decode(&mut decoder)))
+        }));
+
+        Ok(Some(config))
+    }
+}
+
+/// Reads `file` into a string which is passed to the function `f`
+/// and its return value is returned by `map_file`.
+pub fn map_file<R, F>(file: &Path, f: F) -> AppResult<R>
+    where F: FnOnce(String) -> AppResult<R>
+{
+    let mut file = try!(File::open(file));
+
+    let mut contents = String::new();
+    try!(file.read_to_string(&mut contents));
+
+    let r = try!(f(contents));
+    Ok(r)
 }

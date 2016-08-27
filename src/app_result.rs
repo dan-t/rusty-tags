@@ -2,6 +2,7 @@ use std::io;
 use std::convert::From;
 use std::fmt::{self, Display, Formatter};
 use glob;
+use toml;
 use types::SourceKind;
 
 /// The result used in the whole application.
@@ -42,6 +43,12 @@ impl From<io::Error> for AppErr {
 
 impl From<glob::PatternError> for AppErr {
     fn from(err: glob::PatternError) -> AppErr {
+        AppErr::Message(format!("{}", err))
+    }
+}
+
+impl From<toml::DecodeError> for AppErr {
+    fn from(err: toml::DecodeError) -> AppErr {
         AppErr::Message(format!("{}", err))
     }
 }

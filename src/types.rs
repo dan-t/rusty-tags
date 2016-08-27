@@ -1,5 +1,6 @@
 use std::fmt::{Debug, Display, Formatter, Error};
 use std::path::PathBuf;
+use app_result::{AppResult, app_err_msg};
 
 /// For every `TagsRoot` a `rusty-tags.{vi,emacs}` file will be created.
 ///
@@ -177,17 +178,25 @@ arg_enum! {
 /// they use for caching and which user viewable file names they get
 pub struct TagsSpec {
     pub kind: TagsKind,
-    vi_tags_file_name: String,
-    emacs_tags_file_name: String
+
+    /// the file name for vi tags
+    vi_tags: String,
+
+    /// the file name for emacs tags
+    emacs_tags: String
 }
 
 impl TagsSpec {
-    pub fn new(kind: TagsKind, vi_tags_file_name: String, emacs_tags_file_name: String) -> TagsSpec {
-        TagsSpec {
-            kind: kind,
-            vi_tags_file_name: vi_tags_file_name,
-            emacs_tags_file_name: emacs_tags_file_name
+    pub fn new(kind: TagsKind, vi_tags: String, emacs_tags: String) -> AppResult<TagsSpec> {
+        if vi_tags == emacs_tags {
+            return Err(app_err_msg(format!("It's not recommended to use the same tags name '{}' for vi and emacs!", vi_tags)));
         }
+
+        Ok(TagsSpec {
+            kind: kind,
+            vi_tags: vi_tags,
+            emacs_tags: emacs_tags
+        })
     }
 
     pub fn file_extension(&self) -> &'static str {
@@ -199,8 +208,8 @@ impl TagsSpec {
 
     pub fn file_name(&self) -> &str {
         match self.kind {
-            TagsKind::Vi    => &self.vi_tags_file_name,
-            TagsKind::Emacs => &self.emacs_tags_file_name
+            TagsKind::Vi    => &self.vi_tags,
+            TagsKind::Emacs => &self.emacs_tags
         }
     }
 
