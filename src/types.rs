@@ -66,18 +66,18 @@ pub enum SourceKind {
 }
 
 impl SourceKind {
-    pub fn tags_file_name(&self, tags_kind: &TagsKind) -> String {
+    pub fn tags_file_name(&self, tags_spec: &TagsSpec) -> String {
         match *self {
             SourceKind::Git { ref lib_name, ref commit_hash } => {
-                format!("{}-{}.{}", lib_name, commit_hash, tags_kind.tags_file_extension())
+                format!("{}-{}.{}", lib_name, commit_hash, tags_spec.file_extension())
             },
 
             SourceKind::CratesIo { ref lib_name, ref version } => {
-                format!("{}-{}.{}", lib_name, version, tags_kind.tags_file_extension())
+                format!("{}-{}.{}", lib_name, version, tags_spec.file_extension())
             },
 
             SourceKind::Path { .. } => {
-                tags_kind.tags_file_name().to_owned()
+                tags_spec.file_name().to_owned()
             }
         }
     }
@@ -145,13 +145,13 @@ impl Tags {
         Tags { src_dir: src_dir.clone(), tags_file: tags_file.clone(), cached: cached }
     }
 
-    pub fn is_up_to_date(&self, tags_kind: &TagsKind) -> bool {
+    pub fn is_up_to_date(&self, tags_spec: &TagsSpec) -> bool {
         if ! self.cached {
             return false;
         }
 
         let mut src_tags = self.src_dir.clone();
-        src_tags.push(tags_kind.tags_file_name());
+        src_tags.push(tags_spec.file_name());
 
         src_tags.as_path().is_file()
     }
@@ -173,24 +173,39 @@ arg_enum! {
     }
 }
 
-impl TagsKind {
-    pub fn tags_file_extension(&self) -> &'static str {
-        match *self {
+/// holds additional info for the kind of tags, which extension
+/// they use for caching and which user viewable file names they get
+pub struct TagsSpec {
+    pub kind: TagsKind,
+    vi_tags_file_name: String,
+    emacs_tags_file_name: String
+}
+
+impl TagsSpec {
+    pub fn new(kind: TagsKind, vi_tags_file_name: String, emacs_tags_file_name: String) -> TagsSpec {
+        TagsSpec {
+            kind: kind,
+            vi_tags_file_name: vi_tags_file_name,
+            emacs_tags_file_name: emacs_tags_file_name
+        }
+    }
+
+    pub fn file_extension(&self) -> &'static str {
+        match self.kind {
             TagsKind::Vi    => "vi",
             TagsKind::Emacs => "emacs"
         }
     }
 
-    /// the name under which the tags files are saved
-    pub fn tags_file_name(&self) -> &'static str {
-        match *self {
-            TagsKind::Vi    => "rusty-tags.vi",
-            TagsKind::Emacs => "rusty-tags.emacs"
+    pub fn file_name(&self) -> &str {
+        match self.kind {
+            TagsKind::Vi    => &self.vi_tags_file_name,
+            TagsKind::Emacs => &self.emacs_tags_file_name
         }
     }
 
     pub fn ctags_option(&self) -> Option<&'static str> {
-        match *self {
+        match self.kind {
             TagsKind::Vi    => None,
             TagsKind::Emacs => Some("-e")
         }

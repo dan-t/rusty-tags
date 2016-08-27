@@ -1,13 +1,13 @@
 use std::env;
 use std::path::PathBuf;
 use clap::{App, Arg};
-use types::TagsKind;
+use types::{TagsKind, TagsSpec};
 use app_result::{AppResult, app_err_msg};
 
 /// the configuration used to run rusty-tags
 pub struct Config {
-    /// the kind of tags that should be created
-    pub tags_kind: TagsKind,
+    /// the tags that should be created
+    pub tags_spec: TagsSpec,
 
     /// start directory for the search of the 'Cargo.toml'
     pub start_dir: PathBuf,
@@ -24,8 +24,6 @@ pub struct Config {
 
 impl Config {
    pub fn from_command_args() -> AppResult<Config> {
-       let start_dir_value_name = ["DIR"];
-
        let matches = App::new("rusty-tags")
            .about("Create ctags/etags for a cargo project and all of its dependencies")
            // Pull version from Cargo.toml
@@ -35,7 +33,7 @@ impl Config {
            .arg(Arg::with_name("start-dir")
                 .short("s")
                 .long("start-dir")
-                .value_names(&start_dir_value_name)
+                .value_names(&["DIR"])
                 .help("Start directory for the search of the Cargo.toml (default: current working directory)")
                 .takes_value(true))
            .arg_from_usage("-f --force-recreate 'Forces the recreation of all tags'")
@@ -52,8 +50,10 @@ impl Config {
        }
 
        let quiet = matches.is_present("quiet");
+       let kind = value_t_or_exit!(matches.value_of("TAGS_KIND"), TagsKind);
+
        Ok(Config {
-           tags_kind: value_t_or_exit!(matches.value_of("TAGS_KIND"), TagsKind),
+           tags_spec: TagsSpec::new(kind, "rusty-tags.vi".to_string(), "rusty-tags.emacs".to_string()),
            start_dir: start_dir,
            force_recreate: matches.is_present("force-recreate"),
            verbose: if quiet { false } else { matches.is_present("verbose") },

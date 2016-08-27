@@ -63,7 +63,7 @@ fn update_all_tags(config: &Config) -> AppResult<()> {
         match *tags_root {
             TagsRoot::Proj { ref root_dir, ref dependencies } => {
                 let mut src_tags = root_dir.clone();
-                src_tags.push(config.tags_kind.tags_file_name());
+                src_tags.push(config.tags_spec.file_name());
 
                 let src_dir = root_dir.join("src");
 
@@ -88,7 +88,7 @@ fn update_all_tags(config: &Config) -> AppResult<()> {
             TagsRoot::Lib { ref src_kind, ref dependencies } => {
                 let lib_tags = match update_tags_and_check_for_reexports(config, src_kind, dependencies) {
                     Ok(tags) => {
-                        if tags.is_up_to_date(&config.tags_kind) && ! config.force_recreate {
+                        if tags.is_up_to_date(&config.tags_spec) && ! config.force_recreate {
                             continue;
                         } else {
                             tags
@@ -130,7 +130,7 @@ fn update_all_tags(config: &Config) -> AppResult<()> {
         }
 
         let mut tags_file = tag_dir.unwrap();
-        tags_file.push(config.tags_kind.tags_file_name());
+        tags_file.push(config.tags_spec.file_name());
 
         try!(merge_tags(config, &tag_files, &tags_file));
     }
@@ -200,7 +200,7 @@ fn update_std_lib_tags(config: &Config) -> AppResult<()> {
         return Err(app_err_msg(format!("Missing rust source code at '{}'!", src_path.display())));
     }
 
-    let tags_file = src_path.join(config.tags_kind.tags_file_name());
+    let tags_file = src_path.join(config.tags_spec.file_name());
     if tags_file.is_file() && ! config.force_recreate {
         return Ok(());
     }

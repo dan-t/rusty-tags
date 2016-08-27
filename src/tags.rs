@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use std::path::{PathBuf, Path};
 
 use app_result::{AppResult, app_err_msg, app_err_missing_src};
-use types::{Tags, TagsKind, SourceKind};
+use types::{Tags, TagsKind, TagsSpec, SourceKind};
 use config::Config;
 
 use dirs::{
@@ -18,7 +18,7 @@ use dirs::{
 /// Checks if there's already a tags file for `source`
 /// and if not it's creating a new tags file and returning it.
 pub fn update_tags(config: &Config, source: &SourceKind) -> AppResult<Tags> {
-    let src_tags = try!(cached_tags_file(&config.tags_kind, source));
+    let src_tags = try!(cached_tags_file(&config.tags_spec, source));
     let src_dir = try!(find_src_dir(source));
     if src_tags.as_path().is_file() && ! config.force_recreate {
         return Ok(Tags::new(&src_dir, &src_tags, true));
@@ -34,10 +34,10 @@ pub fn update_tags(config: &Config, source: &SourceKind) -> AppResult<Tags> {
 /// crates are merged into the tags of the library.
 pub fn update_tags_and_check_for_reexports(config: &Config,
                                            source: &SourceKind,
-                                           dependencies: &Vec<SourceKind>) 
+                                           dependencies: &Vec<SourceKind>)
                                            -> AppResult<Tags> {
     let lib_tags = try!(update_tags(config, source));
-    if lib_tags.is_up_to_date(&config.tags_kind) && ! config.force_recreate {
+    if lib_tags.is_up_to_date(&config.tags_spec) && ! config.force_recreate {
         return Ok(lib_tags);
     }
 
@@ -82,7 +82,7 @@ pub fn merge_tags(config: &Config, tag_files: &Vec<PathBuf>, into_tag_file: &Pat
         println!("\n   into:\n      {}\n", into_tag_file.display());
     }
 
-    match config.tags_kind {
+    match config.tags_spec.kind {
         TagsKind::Vi => {
             let mut file_contents: Vec<String> = Vec::new();
             for file in tag_files.iter() {
@@ -124,8 +124,7 @@ pub fn merge_tags(config: &Config, tag_files: &Vec<PathBuf>, into_tag_file: &Pat
         },
 
         TagsKind::Emacs => {
-            let mut tag_file = try!(
-                OpenOptions::new()
+            let mut tag_file = try!(OpenOptions::new()
                 .create(true)
                 .append(true)
                 .read(true)
@@ -149,7 +148,7 @@ pub fn merge_tags(config: &Config, tag_files: &Vec<PathBuf>, into_tag_file: &Pat
 pub fn create_tags<P: AsRef<Path>>(config: &Config, src_dirs: &[P], tags_file: P) -> AppResult<()> {
     let mut cmd = Command::new("ctags");
 
-    config.tags_kind.ctags_option().map(|opt| { cmd.arg(opt); () });
+    config.tags_spec.ctags_option().map(|opt| { cmd.arg(opt); () });
 
     cmd.arg("--recurse")
         .arg("--languages=Rust")
@@ -267,17 +266,17 @@ fn find_src_dir(source: &SourceKind) -> AppResult<PathBuf> {
 }
 
 /// returns the position and name of the cached tags file of `source`
-fn cached_tags_file(tags_kind: &TagsKind, source: &SourceKind) -> AppResult<PathBuf> {
+fn cached_tags_file(tags_spec: &TagsSpec, source: &SourceKind) -> AppResult<PathBuf> {
     match *source {
         SourceKind::Git { .. } | SourceKind::CratesIo { .. } => {
             let mut tags_file = try!(rusty_tags_cache_dir().map(Path::to_path_buf));
-            tags_file.push(&source.tags_file_name(tags_kind));
+            tags_file.push(&source.tags_file_name(tags_spec));
             Ok(tags_file)
         },
 
         SourceKind::Path { ref path, .. } => {
             let mut tags_file = path.clone();
-            tags_file.push(&source.tags_file_name(tags_kind));
+            tags_file.push(&source.tags_file_name(tags_spec));
             Ok(tags_file)
         }
     }
