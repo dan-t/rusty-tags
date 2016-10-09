@@ -20,7 +20,7 @@ use dirs::{
 pub fn update_tags(config: &Config, source: &SourceKind) -> AppResult<Tags> {
     let src_tags = try!(cached_tags_file(&config.tags_spec, source));
     let src_dir = try!(find_src_dir(source));
-    if src_tags.as_path().is_file() && ! config.force_recreate {
+    if src_tags.is_file() && ! config.force_recreate {
         return Ok(Tags::new(&src_dir, &src_tags, true));
     }
 
@@ -155,7 +155,7 @@ pub fn merge_tags(config: &Config,
     Ok(())
 }
 
-/// creates tags recursive for the directory hierarchy starting at `src_dirs`
+/// creates tags recursive for the directory hierarchies starting at `src_dirs`
 /// and writes them to `tags_file`
 pub fn create_tags<P: AsRef<Path>>(config: &Config, src_dirs: &[P], tags_file: P) -> AppResult<()> {
     let mut cmd = Command::new("ctags");
