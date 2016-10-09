@@ -1,4 +1,4 @@
-use std::fs::{File, OpenOptions};
+use std::fs::{File, OpenOptions, copy};
 use std::io::{Read, Write};
 use std::process::Command;
 use std::collections::HashSet;
@@ -65,27 +65,38 @@ pub fn update_tags_and_check_for_reexports(config: &Config,
         return Ok(lib_tags);
     }
 
-    crate_tags.push(lib_tags.tags_file.clone());
-    try!(merge_tags(config, &crate_tags, &lib_tags.tags_file));
+    try!(merge_tags(config, &lib_tags.tags_file, &crate_tags, &lib_tags.tags_file));
     Ok(lib_tags)
 }
 
-/// merges `tag_files` into `into_tag_file`
-pub fn merge_tags(config: &Config, tag_files: &Vec<PathBuf>, into_tag_file: &Path) -> AppResult<()> {
+/// merges the library tag file `lib_tag_file` and its dependency tag files
+/// `dependency_tag_files` into `into_tag_file`
+pub fn merge_tags(config: &Config,
+                  lib_tag_file: &Path,
+                  dependency_tag_files: &[PathBuf],
+                  into_tag_file: &Path)
+                  -> AppResult<()> {
     if config.verbose {
         println!("Merging ...\n   tags:");
-
-        for file in tag_files.iter() {
+        println!("      {}", lib_tag_file.display());
+        for file in dependency_tag_files {
             println!("      {}", file.display());
         }
-
         println!("\n   into:\n      {}\n", into_tag_file.display());
     }
 
     match config.tags_spec.kind {
         TagsKind::Vi => {
             let mut file_contents: Vec<String> = Vec::new();
-            for file in tag_files.iter() {
+
+            {
+                let mut file = try!(File::open(lib_tag_file));
+                let mut contents = String::new();
+                try!(file.read_to_string(&mut contents));
+                file_contents.push(contents);
+            }
+
+            for file in dependency_tag_files {
                 let mut file = try!(File::open(file));
                 let mut contents = String::new();
                 try!(file.read_to_string(&mut contents));
@@ -106,14 +117,12 @@ pub fn merge_tags(config: &Config, tag_files: &Vec<PathBuf>, into_tag_file: &Pat
             merged_lines.sort();
             merged_lines.dedup();
 
-            let mut tag_file = try!(
-                OpenOptions::new()
+            let mut tag_file = try!(OpenOptions::new()
                 .create(true)
                 .truncate(true)
                 .read(true)
                 .write(true)
-                .open(into_tag_file)
-            );
+                .open(into_tag_file));
 
             try!(tag_file.write_fmt(format_args!("{}\n", "!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;\" to lines/")));
             try!(tag_file.write_fmt(format_args!("{}\n", "!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/")));
@@ -124,15 +133,18 @@ pub fn merge_tags(config: &Config, tag_files: &Vec<PathBuf>, into_tag_file: &Pat
         },
 
         TagsKind::Emacs => {
+            if lib_tag_file != into_tag_file {
+                try!(copy(lib_tag_file, into_tag_file));
+            }
+
             let mut tag_file = try!(OpenOptions::new()
                 .create(true)
                 .append(true)
                 .read(true)
                 .write(true)
-                .open(into_tag_file)
-            );
+                .open(into_tag_file));
 
-            for file in tag_files.iter() {
+            for file in dependency_tag_files {
                 if file.as_path() != into_tag_file {
                     try!(tag_file.write_fmt(format_args!("{},include\n", file.display())));
                 }

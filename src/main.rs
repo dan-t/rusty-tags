@@ -133,7 +133,7 @@ fn update_all_tags(config: &Config) -> AppResult<()> {
         let mut tags_file = tag_dir.unwrap();
         tags_file.push(config.tags_spec.file_name());
 
-        try!(merge_tags(config, &tag_files, &tags_file));
+        try!(merge_tags(config, &tags_file, &tag_files, &tags_file));
     }
 
     if ! config.quiet {
