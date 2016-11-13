@@ -46,12 +46,26 @@ Rust Standard Library Support
 =============================
 
 `rusty-tags` will create tags for the standard library if you supply
-the rust source by defining the environment variable `$RUST_SRC_PATH`:
+the rust source by defining the environment variable `$RUST_SRC_PATH`.
+
+If you're using [rustup](<https://www.rustup.rs/>) you can get the
+rust source of the currently used compiler version by calling:
+
+    $ rustup component add rust-src
+
+And the setting `$RUST_SRC_PATH` inside of `.bashrc`:
+
+    $ export RUST_SRC_PATH=$(rustc --print sysroot)/lib/rustlib/src/rust/src/
+
+Or without `rustup` by getting the rust source by yourself:
 
     $ git clone https://github.com/rust-lang/rust.git /home/you/rust
     $ cd /home/you/rust
     $ git checkout stable
     $ export RUST_SRC_PATH=/home/you/rust/src/   # should be defined in your ~/.bashrc
+
+Using `rustup` is the recommended way, because the you will automatically get
+the correct standard library tags of the currently used compiler version.
 
 Configuration
 =============
