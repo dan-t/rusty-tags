@@ -5,7 +5,7 @@ rusty-tags
 ==========
 
 A command line tool that creates tags - for source code navigation by
-using [ctags](<http://ctags.sourceforge.net>) - for a cargo project and all
+using [ctags](<http://ctags.sourceforge.net>) - for a [cargo](<https://github.com/rust-lang/cargo>) project and all
 of its dependencies.
 
 Prerequisites
@@ -30,30 +30,27 @@ of the cargo project should just work.
 After its run a `rusty-tags.vi / rusty-tags.emacs` file should be beside of the
 `Cargo.toml` file.
 
-`rusty-tags` will also put a `rusty-tags.vi / rusty-tags.emacs` file to the source
-code of every dependency, so after jumping to a dependency, you're able to jump
-further to its dependencies.
+Additionally every dependency gets a tags file at its source directory, so
+jumping further to its dependencies is possible.
 
-`rusty-tags` should also correctly handle the case if a dependency reexports
-parts of its own dependencies.
+If a dependency reexports parts of its own dependencies, then these reexported
+parts are also contained in the tags file of the dependency.
 
-Currently `rusty-tags` doesn't support dependency overrides and local path
-dependencies are only supported if they're contained in your projects `Cargo.toml`.
-For git dependencies it only searches inside of `~/.cargo/git/checkouts/` and for
-crates.io dependencies inside of `~/.cargo/registry/src/github.com-*`.
+Currently dependency overrides aren't supported and local path dependencies are
+only supported if they're contained in the `Cargo.toml` of the root cargo project.
 
 Rust Standard Library Support
 =============================
 
-`rusty-tags` will create tags for the standard library if you supply
-the rust source by defining the environment variable `$RUST_SRC_PATH`.
+Tags for the standard library are created if the rust source is supplied by
+defining the environment variable `RUST_SRC_PATH`.
 
 If you're using [rustup](<https://www.rustup.rs/>) you can get the
 rust source of the currently used compiler version by calling:
 
     $ rustup component add rust-src
 
-And the setting `$RUST_SRC_PATH` inside of `.bashrc`:
+And then setting `RUST_SRC_PATH` inside of e.g. `~/.bashrc`:
 
     $ export RUST_SRC_PATH=$(rustc --print sysroot)/lib/rustlib/src/rust/src/
 
@@ -102,5 +99,5 @@ MacOS Issues
 ============
 
 Mac OS users may encounter problems with the execution of `ctags` because the shipped version
-of this program does not support the recursive flag. See [this posting](http://gmarik.info/blog/2010/10/08/ctags-on-OSX) 
+of this program does not support the recursive flag. See [this posting](<http://gmarik.info/blog/2010/10/08/ctags-on-OSX>)
 for how to install a working version with homebrew.
