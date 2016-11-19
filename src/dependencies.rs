@@ -3,7 +3,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use toml;
 
-use app_result::{AppResult, app_err_msg};
+use app_result::AppResult;
 use types::{DepTree, SourceKind};
 
 /// Returns the dependency tree of the cargo project.
@@ -32,7 +32,7 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<DepTree> {
                  .filter_map(toml::Value::as_table)
                  .collect()
         })
-        .ok_or(app_err_msg(format!("Couldn't get Array of Tables entry for 'package'!")))
+        .ok_or(format!("Couldn't get Array of Tables entry for 'package'!"))
     );
 
     let mut dep_trees = Vec::new();
@@ -80,7 +80,7 @@ fn get_source_kind_of_dep(&(lib_name, value): &Dep,
             if let Some(path) = table.get("path") {
                 let mut path = try!(
                     path.as_str().ok_or_else(|| {
-                        app_err_msg(format!("Expected a String for 'path' entry in '{}'", value))
+                        format!("Expected a String for 'path' entry in '{}'", value)
                     })
                     .map(PathBuf::from)
                 );
@@ -97,14 +97,12 @@ fn get_source_kind_of_dep(&(lib_name, value): &Dep,
                 let pkg = try!(find_package(&packages, lib_name));
                 Ok(try!(get_source_kind(pkg, lib_name)))
             } else {
-                Err(app_err_msg(format!("Couldn't find a 'path', 'version' or 'git' attribute for '{}' in '{}'",
-                                        lib_name, value)))
+                Err(format!("Couldn't find a 'path', 'version' or 'git' attribute for '{}' in '{}'", lib_name, value).into())
             }
         }
 
         _ => {
-            Err(app_err_msg(format!("Expected a String or a Table for the dependency with the name '{}', but got: '{}'",
-                                    lib_name, value)))
+            Err(format!("Expected a String or a Table for the dependency with the name '{}', but got: '{}'", lib_name, value).into())
         }
     }
 }
@@ -113,19 +111,19 @@ fn get_source_kind(lib_package: &toml::Table, lib_name: &str) -> AppResult<Sourc
     let source = try!(
         lib_package.get("source")
             .and_then(toml::Value::as_str)
-            .ok_or_else(|| app_err_msg(format!("Couldn't find source string in package: '{:?}'!", lib_package)))
+            .ok_or_else(|| format!("Couldn't find source string in package: '{:?}'!", lib_package))
     );
 
     let src_type = try!(
         source.split('+')
             .nth(0)
-            .ok_or_else(|| app_err_msg(format!("Couldn't find source type in: '{}'!", source)))
+            .ok_or_else(|| format!("Couldn't find source type in: '{}'!", source))
     );
 
     let version = try!(
         lib_package.get("version")
             .and_then(toml::Value::as_str)
-            .ok_or_else(|| app_err_msg(format!("Couldn't find version string in package: '{:?}'!", lib_package)))
+            .ok_or_else(|| format!("Couldn't find version string in package: '{:?}'!", lib_package))
     );
 
     match src_type {
@@ -133,7 +131,7 @@ fn get_source_kind(lib_package: &toml::Table, lib_name: &str) -> AppResult<Sourc
             let commit_hash = try!(
                 source.split('#')
                     .last()
-                    .ok_or_else(|| app_err_msg(format!("Couldn't find commit hash in source entry: '{}'!", source)))
+                    .ok_or_else(|| format!("Couldn't find commit hash in source entry: '{}'!", source))
             );
 
             Ok(SourceKind::Git { lib_name: lib_name.to_string(), commit_hash: commit_hash.to_string() })
@@ -144,7 +142,7 @@ fn get_source_kind(lib_package: &toml::Table, lib_name: &str) -> AppResult<Sourc
         }
 
         _ => {
-            Err(app_err_msg(format!("Unexpected source type '{}' in package: '{:?}'!", src_type, lib_package)))
+            Err(format!("Unexpected source type '{}' in package: '{:?}'!", src_type, lib_package).into())
         }
     }
 }
@@ -162,7 +160,7 @@ fn direct_dependencies(cargo_toml: &toml::Table) -> AppResult<Vec<Dep>> {
         if let Some(deps_value) = cargo_toml.get(*dep_type) {
             let deps_table = try!(
                 deps_value.as_table()
-                    .ok_or(app_err_msg(format!("Couldn't get toml::Table entry for '{}'! Got a '{}'!", dep_type, deps_value)))
+                    .ok_or(format!("Couldn't get toml::Table entry for '{}'! Got a '{}'!", dep_type, deps_value))
             );
 
             for dep in deps_table {
@@ -189,14 +187,14 @@ fn get_dependencies(lib_package: &toml::Table) -> AppResult<Vec<&str>> {
                  .filter_map(toml::Value::as_str)
                  .collect()
         })
-        .ok_or_else(|| app_err_msg(format!("Couldn't get Array of Strings for 'dependencies' entry: '{:?}'!", lib_package)))
+        .ok_or_else(|| format!("Couldn't get Array of Strings for 'dependencies' entry: '{:?}'!", lib_package))
     );
 
     for dep_str in dep_strs.iter() {
         let dep_name = try!(
             dep_str.split(' ')
                 .nth(0)
-                .ok_or_else(|| app_err_msg(format!("Couldn't get name from dependency: '{}'!", dep_str)))
+                .ok_or_else(|| format!("Couldn't get name from dependency: '{}'!", dep_str))
             );
 
         dep_names.push(dep_name);
@@ -209,7 +207,7 @@ fn find_package<'a>(packages: &'a Vec<&toml::Table>, lib_name: &str) -> AppResul
     let package = try!(
         packages.iter()
             .find(|p| p.get("name").and_then(toml::Value::as_str) == Some(lib_name))
-            .ok_or_else(|| app_err_msg(format!("Couldn't find package with name = '{}'!", lib_name)))
+            .ok_or_else(|| format!("Couldn't find package with name = '{}'!", lib_name))
     );
 
     Ok(*package)
@@ -220,5 +218,5 @@ fn parse_toml(path: &Path) -> AppResult<toml::Table> {
     let mut string = String::new();
     try!(file.read_to_string(&mut string));
     let mut parser = toml::Parser::new(&string);
-    parser.parse().ok_or_else(|| app_err_msg(format!("Couldn't parse '{}': {:?}", path.display(), parser.errors)))
+    parser.parse().ok_or_else(|| format!("Couldn't parse '{}': {:?}", path.display(), parser.errors).into())
 }

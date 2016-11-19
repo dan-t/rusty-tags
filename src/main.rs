@@ -19,7 +19,7 @@ use std::io::{self, Write};
 use std::process::Command;
 use std::env;
 
-use app_result::{AppResult, app_err_msg};
+use app_result::AppResult;
 use dependencies::read_dependencies;
 use tags::{update_tags, create_tags, move_tags};
 use config::Config;
@@ -85,7 +85,7 @@ fn find_cargo_toml_dir(start_dir: &Path) -> AppResult<PathBuf> {
         }
 
         if ! dir.pop() {
-            return Err(app_err_msg(format!("Couldn't find 'Cargo.toml' starting at directory '{}'!", start_dir.display())));
+            return Err(format!("Couldn't find 'Cargo.toml' starting at directory '{}'!", start_dir.display()).into());
         }
     }
 }
@@ -99,7 +99,7 @@ fn update_std_lib_tags(config: &Config) -> AppResult<()> {
     let src_path_str = src_path_str.unwrap();
     let src_path = Path::new(&src_path_str);
     if ! src_path.is_dir() {
-        return Err(app_err_msg(format!("Missing rust source code at '{}'!", src_path.display())));
+        return Err(format!("Missing rust source code at '{}'!", src_path.display()).into());
     }
 
     let std_lib_tags = src_path.join(config.tags_spec.file_name());

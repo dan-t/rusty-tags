@@ -4,7 +4,7 @@ use std::process::Command;
 use std::collections::HashSet;
 use std::path::{PathBuf, Path};
 
-use app_result::{AppResult, app_err_msg};
+use app_result::AppResult;
 use types::{TagsKind, SourceKind, DepTree};
 use config::Config;
 
@@ -112,7 +112,7 @@ pub fn create_tags<P: AsRef<Path>>(config: &Config, src_dirs: &[P], tags_file: &
     }
 
     let output = try!(cmd.output()
-        .map_err(|err| app_err_msg(format!("ctags execution failed: {}", err))));
+        .map_err(|err| format!("ctags execution failed: {}", err)));
 
     if ! output.status.success() {
         let mut msg = String::from_utf8_lossy(&output.stderr).into_owned();
@@ -124,7 +124,7 @@ pub fn create_tags<P: AsRef<Path>>(config: &Config, src_dirs: &[P], tags_file: &
             msg = "ctags execution failed without any stderr or stdout output".to_string();
         }
 
-        return Err(app_err_msg(msg));
+        return Err(msg.into());
     }
 
     Ok(())

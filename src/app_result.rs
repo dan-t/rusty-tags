@@ -18,14 +18,6 @@ pub enum AppErr {
     MissingSource(SourceKind)
 }
 
-pub fn app_err_msg(msg: String) -> AppErr {
-    AppErr::Message(msg)
-}
-
-pub fn app_err_missing_src(src_kind: &SourceKind) -> AppErr {
-    AppErr::MissingSource(src_kind.clone())
-}
-
 impl Display for AppErr {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
         match self {
@@ -50,5 +42,23 @@ impl From<glob::PatternError> for AppErr {
 impl From<toml::DecodeError> for AppErr {
     fn from(err: toml::DecodeError) -> AppErr {
         AppErr::Message(format!("{}", err))
+    }
+}
+
+impl From<String> for AppErr {
+    fn from(s: String) -> AppErr {
+        AppErr::Message(s)
+    }
+}
+
+impl<'a> From<&'a str> for AppErr {
+    fn from(s: &str) -> AppErr {
+        AppErr::Message(s.to_owned())
+    }
+}
+
+impl<'a> From<&'a SourceKind> for AppErr {
+    fn from(s: &SourceKind) -> AppErr {
+        AppErr::MissingSource(s.clone())
     }
 }

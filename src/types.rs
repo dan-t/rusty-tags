@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Display, Formatter, Error};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use app_result::{AppResult, app_err_msg, app_err_missing_src};
+use app_result::AppResult;
 
 use dirs::{
     cargo_git_src_dir,
@@ -141,7 +141,7 @@ impl SourceKind {
                     }
                 }
 
-                Err(app_err_missing_src(self))
+                Err(self.into())
             },
 
             SourceKind::CratesIo { ref lib_name, ref version } => {
@@ -153,7 +153,7 @@ impl SourceKind {
                     .join(&lib_src);
 
                 if ! src_dir.is_dir() {
-                    return Err(app_err_missing_src(self));
+                    return Err(self.into());
                 }
 
                 Ok(src_dir)
@@ -161,7 +161,7 @@ impl SourceKind {
 
             SourceKind::Path { ref path, .. } => {
                 if ! path.is_dir() {
-                    return Err(app_err_missing_src(self));
+                    return Err(self.into());
                 }
 
                 Ok(path.clone())
@@ -241,7 +241,7 @@ impl TagsFiles {
             return Ok(path.to_path_buf());
         }
 
-        Err(app_err_msg(format!("Can't get directory of path: '{}'", self.src_tags_file.display())))
+        Err(format!("Can't get directory of path: '{}'", self.src_tags_file.display()).into())
     }
 }
 
@@ -269,7 +269,7 @@ pub struct TagsSpec {
 impl TagsSpec {
     pub fn new(kind: TagsKind, vi_tags: String, emacs_tags: String) -> AppResult<TagsSpec> {
         if vi_tags == emacs_tags {
-            return Err(app_err_msg(format!("It's not supported to use the same tags name '{}' for vi and emacs!", vi_tags)));
+            return Err(format!("It's not supported to use the same tags name '{}' for vi and emacs!", vi_tags).into());
         }
 
         Ok(TagsSpec {
@@ -309,9 +309,9 @@ fn get_commit_hash(git_dir: &Path) -> AppResult<String> {
         .arg("HEAD");
 
     let out = try!(cmd.output()
-        .map_err(|err| app_err_msg(format!("git execution failed: {}", err))));
+        .map_err(|err| format!("git execution failed: {}", err)));
 
     String::from_utf8(out.stdout)
         .map(|s| s.trim().to_string())
-        .map_err(|_| app_err_msg("Couldn't convert 'git rev-parse HEAD' output to utf8!".to_string()))
+        .map_err(|_| "Couldn't convert 'git rev-parse HEAD' output to utf8!".into())
 }

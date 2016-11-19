@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use glob::{glob, Paths};
 
-use app_result::{AppResult, app_err_msg};
+use app_result::AppResult;
 
 lazy_static! {
     static ref HOME_DIR               : AppResult<PathBuf> = home_dir_internal();
@@ -63,7 +63,7 @@ fn home_dir_internal() -> AppResult<PathBuf> {
     if let Some(path) = env::home_dir() {
         Ok(path)
     } else {
-        Err(app_err_msg("Couldn't read home directory!".to_string()))
+        Err("Couldn't read home directory!".into())
     }
 }
 
@@ -88,7 +88,7 @@ fn rusty_tags_dir_internal() -> AppResult<PathBuf> {
     let dir = try!(
         home_dir().map(|mut d| {
             d.push(".rusty-tags");
-            d 
+            d
         })
     );
 
@@ -122,7 +122,7 @@ fn cargo_crates_io_src_dir_internal() -> AppResult<PathBuf> {
     if let Some(Ok(path)) = paths.nth(0) {
         Ok(path)
     } else {
-        Err(app_err_msg(format!("Expected one matching path for '{}'!", src_str)))
+        Err(format!("Expected one matching path for '{}'!", src_str).into())
     }
 }
 
@@ -130,7 +130,7 @@ fn cargo_dir_internal() -> AppResult<PathBuf> {
     if let Ok(out) = Command::new("multirust").arg("show-override").output() {
         let output = try!(
             String::from_utf8(out.stdout)
-                .map_err(|_| app_err_msg("Couldn't convert 'multirust show-override' output to utf8!".to_string()))
+                .map_err(|_| "Couldn't convert 'multirust show-override' output to utf8!")
         );
 
         // Make it compatible with 'rustup' which currently still installs
@@ -156,7 +156,7 @@ fn cargo_dir_internal() -> AppResult<PathBuf> {
         }
 
         if ! found_location_but_without_cargo_dir {
-            return Err(app_err_msg(format!("Couldn't get multirust cargo location from output:\n{}", output)));
+            return Err(format!("Couldn't get multirust cargo location from output:\n{}", output).into());
         }
     }
 

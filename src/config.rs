@@ -7,7 +7,7 @@ use toml;
 use rustc_serialize::Decodable;
 use tempdir::TempDir;
 use types::{TagsKind, TagsSpec};
-use app_result::{AppResult, app_err_msg};
+use app_result::AppResult;
 use dirs;
 
 /// the configuration used to run rusty-tags
@@ -54,7 +54,7 @@ impl Config {
            .unwrap_or(try!(env::current_dir()));
 
        if ! start_dir.is_dir() {
-           return Err(app_err_msg(format!("Invalid directory given to '--start-dir': '{}'!", start_dir.display())));
+           return Err(format!("Invalid directory given to '--start-dir': '{}'!", start_dir.display()).into());
        }
 
        let quiet = matches.is_present("quiet");
@@ -107,8 +107,7 @@ impl ConfigFromFile {
         let config = try!(map_file(&config_file, |contents| {
             let mut parser = toml::Parser::new(&contents);
             let value = try!(parser.parse()
-                .ok_or_else(|| app_err_msg(format!("Couldn't parse toml file '{}': {:?}",
-                                                   config_file.display(), parser.errors))));
+                .ok_or_else(|| format!("Couldn't parse toml file '{}': {:?}", config_file.display(), parser.errors)));
 
             let mut decoder = toml::Decoder::new(toml::Value::Table(value));
             Ok(try!(ConfigFromFile::decode(&mut decoder)))
