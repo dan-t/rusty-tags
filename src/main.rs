@@ -1,9 +1,11 @@
 // to silence a bogus warning about `tag_dir` being unused
 #![allow(unused_assignments)]
+#![allow(dead_code)]
 
 extern crate toml;
 extern crate glob;
 extern crate rustc_serialize;
+extern crate tempdir;
 
 #[macro_use]
 extern crate clap;
@@ -17,17 +19,9 @@ use std::io::{self, Write};
 use std::process::Command;
 use std::env;
 
-use app_result::{AppResult, AppErr, app_err_msg};
+use app_result::{AppResult, app_err_msg};
 use dependencies::read_dependencies;
-use types::TagsRoot;
-
-use tags::{
-    update_tags,
-    update_tags_and_check_for_reexports,
-    create_tags,
-    merge_tags
-};
-
+use tags::{update_tags, create_tags, move_tags};
 use config::Config;
 
 mod app_result;
@@ -46,7 +40,9 @@ fn main() {
 
 fn execute() -> AppResult<()> {
     let config = try!(Config::from_command_args());
-    update_all_tags(&config)
+    try!(update_all_tags(&config));
+    let _ = try!(config.temp_dir.close());
+    Ok(())
 }
 
 fn update_all_tags(config: &Config) -> AppResult<()> {
@@ -54,103 +50,8 @@ fn update_all_tags(config: &Config) -> AppResult<()> {
     try!(update_std_lib_tags(&config));
 
     let cargo_dir = try!(find_cargo_toml_dir(&config.start_dir));
-    let tags_roots = try!(read_dependencies(&cargo_dir));
-
-    let mut missing_sources = Vec::new();
-    for tags_root in tags_roots.iter() {
-        let mut tag_files: Vec<PathBuf> = Vec::new();
-        let mut tag_dir: Option<PathBuf> = None;
-
-        match *tags_root {
-            TagsRoot::Proj { ref root_dir, ref dependencies } => {
-                let mut src_tags = root_dir.clone();
-                src_tags.push(config.tags_spec.file_name());
-
-                let src_dir = root_dir.join("src");
-
-                try!(create_tags(config, &[&src_dir], &src_tags));
-                tag_files.push(src_tags);
-
-                for dep in dependencies.iter() {
-                    match update_tags(config, dep) {
-                        Ok(tags) => tag_files.push(tags.tags_file),
-                        Err(app_err) => {
-                            match app_err {
-                                AppErr::MissingSource(src_kind) => missing_sources.push(src_kind),
-                                _ => return Err(app_err)
-                            }
-                        }
-                    }
-                }
-
-                tag_dir = Some(root_dir.clone());
-            },
-
-            TagsRoot::Lib { ref src_kind, ref dependencies } => {
-                let lib_tags = match update_tags_and_check_for_reexports(config, src_kind, dependencies) {
-                    Ok(tags) => {
-                        if tags.is_up_to_date(&config.tags_spec) && ! config.force_recreate {
-                            continue;
-                        } else {
-                            tags
-                        }
-                    }
-
-                    Err(app_err) => {
-                        match app_err {
-                            AppErr::MissingSource(src_kind) => {
-                                missing_sources.push(src_kind);
-                                continue;
-                            }
-
-                            _ => return Err(app_err)
-                        }
-                    }
-                };
-
-                tag_files.push(lib_tags.tags_file);
-
-                for dep in dependencies.iter() {
-                    match update_tags(config, dep) {
-                        Ok(tags) => tag_files.push(tags.tags_file),
-                        Err(app_err) => {
-                            match app_err {
-                                AppErr::MissingSource(src_kind) => missing_sources.push(src_kind),
-                                _ => return Err(app_err)
-                            }
-                        }
-                    }
-                }
-
-                tag_dir = Some(lib_tags.src_dir.clone());
-            }
-        }
-
-        if tag_files.is_empty() || tag_dir.is_none() {
-            continue;
-        }
-
-        let mut tags_file = tag_dir.unwrap();
-        tags_file.push(config.tags_spec.file_name());
-
-        try!(merge_tags(config, &tags_file, &tag_files, &tags_file));
-    }
-
-    if ! config.quiet {
-        if ! missing_sources.is_empty() {
-            println!("Couldn't find source code of dependencies:");
-            for src in missing_sources.iter() {
-                println!("   {}", src);
-            }
-
-            println!("
-The dependencies might be platform specific and not needed on your current platform.
-You might try calling 'cargo fetch' by hand again.
-");
-        }
-    }
-
-    Ok(())
+    let dep_tree = try!(read_dependencies(&cargo_dir));
+    update_tags(&config, &dep_tree)
 }
 
 fn fetch_source_of_dependencies(config: &Config) -> AppResult<()> {
@@ -201,8 +102,8 @@ fn update_std_lib_tags(config: &Config) -> AppResult<()> {
         return Err(app_err_msg(format!("Missing rust source code at '{}'!", src_path.display())));
     }
 
-    let tags_file = src_path.join(config.tags_spec.file_name());
-    if tags_file.is_file() && ! config.force_recreate {
+    let std_lib_tags = src_path.join(config.tags_spec.file_name());
+    if std_lib_tags.is_file() && ! config.force_recreate {
         return Ok(());
     }
 
@@ -233,6 +134,8 @@ fn update_std_lib_tags(config: &Config) -> AppResult<()> {
         }
     }
 
-    try!(create_tags(&config, &src_dirs, tags_file));
+    let tmp_std_lib_tags = config.temp_file("std_lib_tags");
+    try!(create_tags(config, &src_dirs, &tmp_std_lib_tags));
+    try!(move_tags(config, &tmp_std_lib_tags, &std_lib_tags));
     Ok(())
 }

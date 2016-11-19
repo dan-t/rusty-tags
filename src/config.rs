@@ -5,6 +5,7 @@ use std::io::Read;
 use clap::{App, Arg};
 use toml;
 use rustc_serialize::Decodable;
+use tempdir::TempDir;
 use types::{TagsKind, TagsSpec};
 use app_result::{AppResult, app_err_msg};
 use dirs;
@@ -24,7 +25,9 @@ pub struct Config {
     pub verbose: bool,
 
     /// don't output anything but errors
-    pub quiet: bool
+    pub quiet: bool,
+
+    pub temp_dir: TempDir
 }
 
 impl Config {
@@ -68,13 +71,19 @@ impl Config {
            (vt, et)
        };
 
+       let temp_dir = try!(TempDir::new_in(&start_dir, "rusty-tags-temp-dir"));
        Ok(Config {
            tags_spec: try!(TagsSpec::new(kind, vi_tags, emacs_tags)),
            start_dir: start_dir,
            force_recreate: matches.is_present("force-recreate"),
            verbose: if quiet { false } else { matches.is_present("verbose") },
-           quiet: quiet
+           quiet: quiet,
+           temp_dir: temp_dir
        })
+   }
+
+   pub fn temp_file(&self, file_name: &str) -> PathBuf {
+       self.temp_dir.path().join(file_name)
    }
 }
 

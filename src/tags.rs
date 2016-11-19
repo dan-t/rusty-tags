@@ -1,49 +1,152 @@
-use std::fs::{File, OpenOptions, copy};
+use std::fs::{File, OpenOptions, copy, rename, remove_file};
 use std::io::{Read, Write};
 use std::process::Command;
 use std::collections::HashSet;
 use std::path::{PathBuf, Path};
 
-use app_result::{AppResult, app_err_msg, app_err_missing_src};
-use types::{Tags, TagsKind, TagsSpec, SourceKind};
+use app_result::{AppResult, app_err_msg};
+use types::{TagsKind, SourceKind, DepTree};
 use config::Config;
 
-use dirs::{
-    rusty_tags_cache_dir,
-    cargo_git_src_dir,
-    cargo_crates_io_src_dir,
-    glob_path
-};
-
-/// Checks if there's already a tags file for `source`
-/// and if not it's creating a new tags file and returning it.
-pub fn update_tags(config: &Config, source: &SourceKind) -> AppResult<Tags> {
-    let src_tags = try!(cached_tags_file(&config.tags_spec, source));
-    let src_dir = try!(find_src_dir(source));
-    if src_tags.is_file() && ! config.force_recreate {
-        return Ok(Tags::new(&src_dir, &src_tags, true));
+pub fn update_tags(config: &Config, dep_tree: &DepTree) -> AppResult<()> {
+    let tags_files = try!(dep_tree.source.tags_files(&config.tags_spec));
+    if ! dep_tree.source.is_root() && ! config.force_recreate && tags_files.are_files() {
+        return Ok(());
     }
 
-    try!(create_tags(config, &[&src_dir], &src_tags));
-    Ok(Tags::new(&src_dir, &src_tags, false))
+    for dep in &dep_tree.dependencies {
+        try!(update_tags(config, dep))
+    }
+
+    let tmp_src_tags = config.temp_file("src_tags");
+    let src_dir = try!(tags_files.src_dir());
+    try!(create_tags(config, &[&src_dir], &&tmp_src_tags));
+
+    let direct_deps = dep_tree.direct_dep_sources();
+
+    // create the cached tags file of 'dep_tree.source' which
+    // might also contain the tags of dependencies if they're
+    // reexported
+    if let Some(cached_tags_file) = tags_files.cached_tags_file {
+        let reexp_deps = try!(reexported_deps(config,
+                                              &dep_tree.source,
+                                              &direct_deps));
+
+        let mut reexp_tags_files = Vec::new();
+        for rdep in &reexp_deps {
+            let tags_files = try!(rdep.tags_files(&config.tags_spec));
+            if let Some(file) = tags_files.cached_tags_file {
+                reexp_tags_files.push(file);
+            }
+        }
+
+        let tmp_cached_tags = config.temp_file("cached_tags");
+        if ! reexp_tags_files.is_empty() {
+            try!(merge_tags(config, &tmp_src_tags, &reexp_tags_files, &tmp_cached_tags));
+        } else {
+            try!(copy(&tmp_src_tags, &tmp_cached_tags));
+        }
+
+        try!(move_tags(config, &tmp_cached_tags, &cached_tags_file));
+    }
+
+    // create the source tags file of 'dep_tree.source' by merging
+    // the tags of 'source' and of its dependencies
+    {
+        let mut dep_tags_files = Vec::new();
+        for dep in &direct_deps {
+            let tags_files = try!(dep.tags_files(&config.tags_spec));
+            if let Some(file) = tags_files.cached_tags_file {
+                dep_tags_files.push(file);
+            }
+        }
+
+        let tmp_src_and_deps_tags = config.temp_file("src_and_deps_tags");
+        if ! dep_tags_files.is_empty() {
+            try!(merge_tags(config, &tmp_src_tags, &dep_tags_files, &tmp_src_and_deps_tags));
+        } else {
+            try!(copy(&tmp_src_tags, &tmp_src_and_deps_tags));
+        }
+
+        try!(move_tags(config, &tmp_src_and_deps_tags, &tags_files.src_tags_file));
+    }
+
+    try!(remove_file(&tmp_src_tags));
+
+    Ok(())
 }
 
-/// Does the same thing as `update_tags`, but also checks if the `lib.rs`
-/// file of the library has public reexports of external crates. If
-/// that's the case, then the tags of the public reexported external
-/// crates are merged into the tags of the library.
-pub fn update_tags_and_check_for_reexports(config: &Config,
-                                           source: &SourceKind,
-                                           dependencies: &Vec<SourceKind>)
-                                           -> AppResult<Tags> {
-    let lib_tags = try!(update_tags(config, source));
-    if lib_tags.is_up_to_date(&config.tags_spec) && ! config.force_recreate {
-        return Ok(lib_tags);
+/// creates tags recursive for the directory hierarchies starting at `src_dirs`
+/// and writes them to `tags_file`
+pub fn create_tags<P: AsRef<Path>>(config: &Config, src_dirs: &[P], tags_file: &P) -> AppResult<()> {
+    let mut cmd = Command::new("ctags");
+
+    config.tags_spec.ctags_option().map(|opt| { cmd.arg(opt); () });
+
+    cmd.arg("--recurse")
+        .arg("--languages=Rust")
+        .arg("--langdef=Rust")
+        .arg("--langmap=Rust:.rs")
+        .arg("--regex-Rust=/^[ \\t]*(#\\[[^\\]]\\][ \\t]*)*(pub[ \\t]+)?(extern[ \\t]+)?(\"[^\"]+\"[ \\t]+)?(unsafe[ \\t]+)?fn[ \\t]+([a-zA-Z0-9_]+)/\\6/f,functions,function definitions/")
+        .arg("--regex-Rust=/^[ \\t]*(pub[ \\t]+)?type[ \\t]+([a-zA-Z0-9_]+)/\\2/T,types,type definitions/")
+        .arg("--regex-Rust=/^[ \\t]*(pub[ \\t]+)?enum[ \\t]+([a-zA-Z0-9_]+)/\\2/g,enum,enumeration names/")
+        .arg("--regex-Rust=/^[ \\t]*(pub[ \\t]+)?struct[ \\t]+([a-zA-Z0-9_]+)/\\2/s,structure names/")
+        .arg("--regex-Rust=/^[ \\t]*(pub[ \\t]+)?mod[ \\t]+([a-zA-Z0-9_]+)\\s*\\{/\\2/m,modules,module names/")
+        .arg("--regex-Rust=/^[ \\t]*(pub[ \\t]+)?(static|const)[ \\t]+([a-zA-Z0-9_]+)/\\3/c,consts,static constants/")
+        .arg("--regex-Rust=/^[ \\t]*(pub[ \\t]+)?trait[ \\t]+([a-zA-Z0-9_]+)/\\2/t,traits,traits/")
+        .arg("--regex-Rust=/^[ \\t]*macro_rules![ \\t]+([a-zA-Z0-9_]+)/\\1/d,macros,macro definitions/")
+        .arg("-o")
+        .arg(tags_file.as_ref());
+
+    for dir in src_dirs {
+        cmd.arg(dir.as_ref());
     }
 
-    let reexp_crates = try!(find_reexported_crates(&lib_tags.src_dir));
+    if config.verbose {
+        println!("\nCreating tags ...\n   for source:");
+        for dir in src_dirs {
+            println!("      {}", dir.as_ref().display());
+        }
+
+        println!("\n   cached at:\n      {}", tags_file.as_ref().display());
+    }
+
+    let output = try!(cmd.output()
+        .map_err(|err| app_err_msg(format!("ctags execution failed: {}", err))));
+
+    if ! output.status.success() {
+        let mut msg = String::from_utf8_lossy(&output.stderr).into_owned();
+        if msg.is_empty() {
+            msg = String::from_utf8_lossy(&output.stdout).into_owned();
+        }
+
+        if msg.is_empty() {
+            msg = "ctags execution failed without any stderr or stdout output".to_string();
+        }
+
+        return Err(app_err_msg(msg));
+    }
+
+    Ok(())
+}
+
+pub fn move_tags(config: &Config, from_tags: &Path, to_tags: &Path) -> AppResult<()> {
+    if config.verbose {
+        println!("\nMove tags ...\n   from:\n      {}\n   to:\n      {}", from_tags.display(), to_tags.display());
+    }
+
+    let _ = try!(rename(from_tags, to_tags));
+    Ok(())
+}
+
+fn reexported_deps(config: &Config,
+                   source: &SourceKind,
+                   deps: &[SourceKind])
+                   -> AppResult<Vec<SourceKind>> {
+    let tags_files = try!(source.tags_files(&config.tags_spec));
+    let reexp_crates = try!(find_reexported_crates(&try!(tags_files.src_dir())));
     if reexp_crates.is_empty() {
-        return Ok(lib_tags);
+        return Ok(Vec::new());
     }
 
     if config.verbose {
@@ -54,35 +157,30 @@ pub fn update_tags_and_check_for_reexports(config: &Config,
         println!("");
     }
 
-    let mut crate_tags = Vec::<PathBuf>::new();
-    for rcrate in reexp_crates.iter() {
-        if let Some(crate_dep) = dependencies.iter().find(|d| d.get_lib_name() == *rcrate) {
-            crate_tags.push(try!(update_tags(config, crate_dep)).tags_file.clone());
+    let mut reexp_deps = Vec::new();
+    for rcrate in &reexp_crates {
+        if let Some(crate_dep) = deps.iter().find(|d| d.get_lib_name() == *rcrate) {
+            reexp_deps.push(crate_dep.clone());
         }
     }
 
-    if crate_tags.is_empty() {
-        return Ok(lib_tags);
-    }
-
-    try!(merge_tags(config, &lib_tags.tags_file, &crate_tags, &lib_tags.tags_file));
-    Ok(lib_tags)
+    Ok(reexp_deps)
 }
 
 /// merges the library tag file `lib_tag_file` and its dependency tag files
 /// `dependency_tag_files` into `into_tag_file`
-pub fn merge_tags(config: &Config,
-                  lib_tag_file: &Path,
-                  dependency_tag_files: &[PathBuf],
-                  into_tag_file: &Path)
-                  -> AppResult<()> {
+fn merge_tags(config: &Config,
+              lib_tag_file: &Path,
+              dependency_tag_files: &[PathBuf],
+              into_tag_file: &Path)
+              -> AppResult<()> {
     if config.verbose {
-        println!("Merging ...\n   tags:");
+        println!("\nMerging ...\n   tags:");
         println!("      {}", lib_tag_file.display());
         for file in dependency_tag_files {
             println!("      {}", file.display());
         }
-        println!("\n   into:\n      {}\n", into_tag_file.display());
+        println!("\n   into:\n      {}", into_tag_file.display());
     }
 
     match config.tags_spec.kind {
@@ -155,145 +253,6 @@ pub fn merge_tags(config: &Config,
     Ok(())
 }
 
-/// creates tags recursive for the directory hierarchies starting at `src_dirs`
-/// and writes them to `tags_file`
-pub fn create_tags<P: AsRef<Path>>(config: &Config, src_dirs: &[P], tags_file: P) -> AppResult<()> {
-    let mut cmd = Command::new("ctags");
-
-    config.tags_spec.ctags_option().map(|opt| { cmd.arg(opt); () });
-
-    cmd.arg("--recurse")
-        .arg("--languages=Rust")
-        .arg("--langdef=Rust")
-        .arg("--langmap=Rust:.rs")
-        .arg("--regex-Rust=/^[ \\t]*(#\\[[^\\]]\\][ \\t]*)*(pub[ \\t]+)?(extern[ \\t]+)?(\"[^\"]+\"[ \\t]+)?(unsafe[ \\t]+)?fn[ \\t]+([a-zA-Z0-9_]+)/\\6/f,functions,function definitions/")
-        .arg("--regex-Rust=/^[ \\t]*(pub[ \\t]+)?type[ \\t]+([a-zA-Z0-9_]+)/\\2/T,types,type definitions/")
-        .arg("--regex-Rust=/^[ \\t]*(pub[ \\t]+)?enum[ \\t]+([a-zA-Z0-9_]+)/\\2/g,enum,enumeration names/")
-        .arg("--regex-Rust=/^[ \\t]*(pub[ \\t]+)?struct[ \\t]+([a-zA-Z0-9_]+)/\\2/s,structure names/")
-        .arg("--regex-Rust=/^[ \\t]*(pub[ \\t]+)?mod[ \\t]+([a-zA-Z0-9_]+)\\s*\\{/\\2/m,modules,module names/")
-        .arg("--regex-Rust=/^[ \\t]*(pub[ \\t]+)?(static|const)[ \\t]+([a-zA-Z0-9_]+)/\\3/c,consts,static constants/")
-        .arg("--regex-Rust=/^[ \\t]*(pub[ \\t]+)?trait[ \\t]+([a-zA-Z0-9_]+)/\\2/t,traits,traits/")
-        .arg("--regex-Rust=/^[ \\t]*macro_rules![ \\t]+([a-zA-Z0-9_]+)/\\1/d,macros,macro definitions/")
-        .arg("-o")
-        .arg(tags_file.as_ref());
-
-    for dir in src_dirs {
-        cmd.arg(dir.as_ref());
-    }
-
-    if config.verbose {
-        println!("Creating tags ...\n   for source:");
-        for dir in src_dirs {
-            println!("      {}", dir.as_ref().display());
-        }
-
-        println!("\n   cached at:\n      {}\n", tags_file.as_ref().display());
-    }
-
-    let output = try!(cmd.output()
-        .map_err(|err| app_err_msg(format!("ctags execution failed: {}", err))));
-
-    if ! output.status.success() {
-        let mut msg = String::from_utf8_lossy(&output.stderr).into_owned();
-        if msg.is_empty() {
-            msg = String::from_utf8_lossy(&output.stdout).into_owned();
-        }
-
-        if msg.is_empty() {
-            msg = "ctags execution failed without any stderr or stdout output".to_string();
-        }
-
-        return Err(app_err_msg(msg));
-    }
-
-    Ok(())
-}
-
-/// find the source directory of `source`, for git sources the directories
-/// in `~/.cargo/git/checkouts` are considered and for crates.io sources
-/// the directories in `~/.cargo/registry/src/github.com-*` are considered
-fn find_src_dir(source: &SourceKind) -> AppResult<PathBuf> {
-    match *source {
-        SourceKind::Git { ref lib_name, ref commit_hash } => {
-            let mut lib_src = lib_name.clone();
-            lib_src.push_str("-*");
-
-            let mut src_dir = try!(cargo_git_src_dir().map(Path::to_path_buf));
-            src_dir.push(&lib_src);
-            src_dir.push("master");
-
-            let src_paths = try!(glob_path(&format!("{}", src_dir.display())));
-            for src_path in src_paths {
-                if let Ok(path) = src_path {
-                    let src_commit_hash = try!(get_commit_hash(&path));
-                    if *commit_hash == src_commit_hash {
-                        return Ok(path);
-                    }
-                }
-            }
-
-            // the git repository name hasn't to match the name of the library,
-            // so here we're just going through all git directories and searching
-            // for the one with a matching commit hash
-            let mut src_dir = try!(cargo_git_src_dir().map(Path::to_path_buf));
-            src_dir.push("*");
-            src_dir.push("master");
-
-            let src_paths = try!(glob_path(&format!("{}", src_dir.display())));
-            for src_path in src_paths {
-                if let Ok(path) = src_path {
-                    let src_commit_hash = try!(get_commit_hash(&path));
-                    if *commit_hash == src_commit_hash {
-                        return Ok(path);
-                    }
-                }
-            }
-
-            Err(app_err_missing_src(source))
-        },
-
-        SourceKind::CratesIo { ref lib_name, ref version } => {
-            let mut lib_src = lib_name.clone();
-            lib_src.push('-');
-            lib_src.push_str(&**version);
-
-            let mut src_dir = try!(cargo_crates_io_src_dir().map(Path::to_path_buf));
-            src_dir.push(&lib_src);
-
-            if ! src_dir.is_dir() {
-                return Err(app_err_missing_src(source));
-            }
-
-            Ok(src_dir)
-        },
-
-        SourceKind::Path { ref path, .. } => {
-            if ! path.is_dir() {
-                return Err(app_err_missing_src(source));
-            }
-
-            Ok(path.clone())
-        }
-    }
-}
-
-/// returns the position and name of the cached tags file of `source`
-fn cached_tags_file(tags_spec: &TagsSpec, source: &SourceKind) -> AppResult<PathBuf> {
-    match *source {
-        SourceKind::Git { .. } | SourceKind::CratesIo { .. } => {
-            let mut tags_file = try!(rusty_tags_cache_dir().map(Path::to_path_buf));
-            tags_file.push(&source.tags_file_name(tags_spec));
-            Ok(tags_file)
-        },
-
-        SourceKind::Path { ref path, .. } => {
-            let mut tags_file = path.clone();
-            tags_file.push(&source.tags_file_name(tags_spec));
-            Ok(tags_file)
-        }
-    }
-}
-
 type CrateName = String;
 
 /// searches in the file `<src_dir>/src/lib.rs` for external crates
@@ -358,19 +317,4 @@ fn find_reexported_crates(src_dir: &Path) -> AppResult<Vec<CrateName>> {
     }
 
     Ok(reexp_crates)
-}
-
-/// get the commit hash of the current `HEAD` of the git repository located at `git_dir`
-fn get_commit_hash(git_dir: &Path) -> AppResult<String> {
-    let mut cmd = Command::new("git");
-    cmd.current_dir(git_dir)
-        .arg("rev-parse")
-        .arg("HEAD");
-
-    let out = try!(cmd.output()
-        .map_err(|err| app_err_msg(format!("git execution failed: {}", err))));
-
-    String::from_utf8(out.stdout)
-        .map(|s| s.trim().to_string())
-        .map_err(|_| app_err_msg("Couldn't convert 'git rev-parse HEAD' output to utf8!".to_string()))
 }
