@@ -3,11 +3,11 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use toml;
 
-use app_result::AppResult;
+use rt_result::RtResult;
 use types::{DepTree, SourceKind};
 
 /// Returns the dependency tree of the cargo project.
-pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<DepTree> {
+pub fn read_dependencies(cargo_toml_dir: &Path) -> RtResult<DepTree> {
     let toml_table = try!(parse_toml(&cargo_toml_dir.join("Cargo.toml")));
 
     // The direct dependencies of the cargo project have to be handeled differently then the
@@ -47,7 +47,7 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> AppResult<DepTree> {
     })
 }
 
-fn build_dep_tree(source: SourceKind, packages: &Vec<&toml::Table>) -> AppResult<DepTree> {
+fn build_dep_tree(source: SourceKind, packages: &Vec<&toml::Table>) -> RtResult<DepTree> {
     let pkg = try!(find_package(&packages, source.get_lib_name()));
     let deps = try!(get_dependencies(&pkg));
 
@@ -67,7 +67,7 @@ fn build_dep_tree(source: SourceKind, packages: &Vec<&toml::Table>) -> AppResult
 fn get_source_kind_of_dep(&(lib_name, value): &Dep,
                           cargo_toml_dir: &Path,
                           packages: &Vec<&toml::Table>)
-                          -> AppResult<SourceKind> {
+                          -> RtResult<SourceKind> {
     match *value {
         // handling crates.io dependencies with a version
         toml::Value::String(_) => {
@@ -107,7 +107,7 @@ fn get_source_kind_of_dep(&(lib_name, value): &Dep,
     }
 }
 
-fn get_source_kind(lib_package: &toml::Table, lib_name: &str) -> AppResult<SourceKind> {
+fn get_source_kind(lib_package: &toml::Table, lib_name: &str) -> RtResult<SourceKind> {
     let source = try!(
         lib_package.get("source")
             .and_then(toml::Value::as_str)
@@ -154,7 +154,7 @@ type Dep<'a> = (&'a DepName, &'a DepVal);
 
 /// Collects all direct dependencies specified in the `Cargo.toml`. The dependencies might
 /// be specified by `dependencies`, `build-dependencies` or `dev-dependencies`.
-fn direct_dependencies(cargo_toml: &toml::Table) -> AppResult<Vec<Dep>> {
+fn direct_dependencies(cargo_toml: &toml::Table) -> RtResult<Vec<Dep>> {
     let mut deps = Vec::with_capacity(50);
     for dep_type in &["dependencies", "build-dependencies", "dev-dependencies"] {
         if let Some(deps_value) = cargo_toml.get(*dep_type) {
@@ -172,7 +172,7 @@ fn direct_dependencies(cargo_toml: &toml::Table) -> AppResult<Vec<Dep>> {
     Ok(deps)
 }
 
-fn get_dependencies(lib_package: &toml::Table) -> AppResult<Vec<&str>> {
+fn get_dependencies(lib_package: &toml::Table) -> RtResult<Vec<&str>> {
     let mut dep_names: Vec<&str> = Vec::new();
 
     if ! lib_package.contains_key("dependencies") {
@@ -203,7 +203,7 @@ fn get_dependencies(lib_package: &toml::Table) -> AppResult<Vec<&str>> {
     Ok(dep_names)
 }
 
-fn find_package<'a>(packages: &'a Vec<&toml::Table>, lib_name: &str) -> AppResult<&'a toml::Table> {
+fn find_package<'a>(packages: &'a Vec<&toml::Table>, lib_name: &str) -> RtResult<&'a toml::Table> {
     let package = try!(
         packages.iter()
             .find(|p| p.get("name").and_then(toml::Value::as_str) == Some(lib_name))
@@ -213,7 +213,7 @@ fn find_package<'a>(packages: &'a Vec<&toml::Table>, lib_name: &str) -> AppResul
     Ok(*package)
 }
 
-fn parse_toml(path: &Path) -> AppResult<toml::Table> {
+fn parse_toml(path: &Path) -> RtResult<toml::Table> {
     let mut file = try!(File::open(path));
     let mut string = String::new();
     try!(file.read_to_string(&mut string));

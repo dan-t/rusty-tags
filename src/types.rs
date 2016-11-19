@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Display, Formatter, Error};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use app_result::AppResult;
+use rt_result::RtResult;
 
 use dirs::{
     cargo_git_src_dir,
@@ -55,7 +55,7 @@ pub enum SourceKind {
 }
 
 impl SourceKind {
-    pub fn tags_files(&self, tags_spec: &TagsSpec) -> AppResult<TagsFiles> {
+    pub fn tags_files(&self, tags_spec: &TagsSpec) -> RtResult<TagsFiles> {
         Ok(TagsFiles {
             cached_tags_file: try!(self.cached_tags_file(tags_spec)),
             src_tags_file: try!(self.src_tags_file(tags_spec))
@@ -89,7 +89,7 @@ impl SourceKind {
         }
     }
 
-    fn cached_tags_file(&self, tags_spec: &TagsSpec) -> AppResult<Option<PathBuf>> {
+    fn cached_tags_file(&self, tags_spec: &TagsSpec) -> RtResult<Option<PathBuf>> {
         if let Some(name) = self.cached_tags_file_name(tags_spec) {
             Ok(Some(try!(rusty_tags_cache_dir()).join(name)))
         } else {
@@ -97,14 +97,14 @@ impl SourceKind {
         }
     }
 
-    fn src_tags_file(&self, tags_spec: &TagsSpec) -> AppResult<PathBuf> {
+    fn src_tags_file(&self, tags_spec: &TagsSpec) -> RtResult<PathBuf> {
         Ok(try!(self.src_root_dir()).join(tags_spec.file_name()))
     }
 
     /// find the root source directory, for git sources the directories
     /// in `~/.cargo/git/checkouts` are considered and for crates.io sources
     /// the directories in `~/.cargo/registry/src/github.com-*` are considered
-    fn src_root_dir(&self) -> AppResult<PathBuf> {
+    fn src_root_dir(&self) -> RtResult<PathBuf> {
         match *self {
             SourceKind::Git { ref lib_name, ref commit_hash } => {
                 let mut lib_src = lib_name.clone();
@@ -236,7 +236,7 @@ impl TagsFiles {
         self.src_tags_file.is_file()
     }
 
-    pub fn src_dir(&self) -> AppResult<PathBuf> {
+    pub fn src_dir(&self) -> RtResult<PathBuf> {
         if let Some(path) = self.src_tags_file.parent() {
             return Ok(path.to_path_buf());
         }
@@ -267,7 +267,7 @@ pub struct TagsSpec {
 }
 
 impl TagsSpec {
-    pub fn new(kind: TagsKind, vi_tags: String, emacs_tags: String) -> AppResult<TagsSpec> {
+    pub fn new(kind: TagsKind, vi_tags: String, emacs_tags: String) -> RtResult<TagsSpec> {
         if vi_tags == emacs_tags {
             return Err(format!("It's not supported to use the same tags name '{}' for vi and emacs!", vi_tags).into());
         }
@@ -302,7 +302,7 @@ impl TagsSpec {
 }
 
 /// get the commit hash of the current `HEAD` of the git repository located at `git_dir`
-fn get_commit_hash(git_dir: &Path) -> AppResult<String> {
+fn get_commit_hash(git_dir: &Path) -> RtResult<String> {
     let mut cmd = Command::new("git");
     cmd.current_dir(git_dir)
         .arg("rev-parse")

@@ -4,19 +4,19 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use glob::{glob, Paths};
 
-use app_result::AppResult;
+use rt_result::RtResult;
 
 lazy_static! {
-    static ref HOME_DIR               : AppResult<PathBuf> = home_dir_internal();
-    static ref RUSTY_TAGS_DIR         : AppResult<PathBuf> = rusty_tags_dir_internal();
-    static ref RUSTY_TAGS_CACHE_DIR   : AppResult<PathBuf> = rusty_tags_cache_dir_internal();
-    static ref CARGO_DIR              : AppResult<PathBuf> = cargo_dir_internal();
-    static ref CARGO_GIT_SRC_DIR      : AppResult<PathBuf> = cargo_git_src_dir_internal();
-    static ref CARGO_CRATES_IO_SRC_DIR: AppResult<PathBuf> = cargo_crates_io_src_dir_internal();
+    static ref HOME_DIR               : RtResult<PathBuf> = home_dir_internal();
+    static ref RUSTY_TAGS_DIR         : RtResult<PathBuf> = rusty_tags_dir_internal();
+    static ref RUSTY_TAGS_CACHE_DIR   : RtResult<PathBuf> = rusty_tags_cache_dir_internal();
+    static ref CARGO_DIR              : RtResult<PathBuf> = cargo_dir_internal();
+    static ref CARGO_GIT_SRC_DIR      : RtResult<PathBuf> = cargo_git_src_dir_internal();
+    static ref CARGO_CRATES_IO_SRC_DIR: RtResult<PathBuf> = cargo_crates_io_src_dir_internal();
 }
 
 /// where rusty-tags puts all of its stuff
-pub fn rusty_tags_dir() -> AppResult<&'static Path> {
+pub fn rusty_tags_dir() -> RtResult<&'static Path> {
     RUSTY_TAGS_DIR
         .as_ref()
         .map(|pb| pb.as_path())
@@ -24,7 +24,7 @@ pub fn rusty_tags_dir() -> AppResult<&'static Path> {
 }
 
 /// where `rusty-tags` caches its tag files
-pub fn rusty_tags_cache_dir() -> AppResult<&'static Path> {
+pub fn rusty_tags_cache_dir() -> RtResult<&'static Path> {
     RUSTY_TAGS_CACHE_DIR
         .as_ref()
         .map(|pb| pb.as_path())
@@ -32,7 +32,7 @@ pub fn rusty_tags_cache_dir() -> AppResult<&'static Path> {
 }
 
 /// where cargo puts its git checkouts
-pub fn cargo_git_src_dir() -> AppResult<&'static Path> {
+pub fn cargo_git_src_dir() -> RtResult<&'static Path> {
     CARGO_GIT_SRC_DIR
         .as_ref()
         .map(|pb| pb.as_path())
@@ -40,26 +40,26 @@ pub fn cargo_git_src_dir() -> AppResult<&'static Path> {
 }
 
 /// where cargo puts the source code of crates.io
-pub fn cargo_crates_io_src_dir() -> AppResult<&'static Path> {
+pub fn cargo_crates_io_src_dir() -> RtResult<&'static Path> {
     CARGO_CRATES_IO_SRC_DIR
         .as_ref()
         .map(|pb| pb.as_path())
         .map_err(|err| err.clone())
 }
 
-pub fn glob_path(pattern: &String) -> AppResult<Paths> {
+pub fn glob_path(pattern: &String) -> RtResult<Paths> {
     Ok(try!(glob(&pattern)))
 }
 
-fn home_dir() -> AppResult<PathBuf> {
+fn home_dir() -> RtResult<PathBuf> {
     HOME_DIR.clone()
 }
 
-fn cargo_dir() -> AppResult<PathBuf> {
+fn cargo_dir() -> RtResult<PathBuf> {
     CARGO_DIR.clone()
 }
 
-fn home_dir_internal() -> AppResult<PathBuf> {
+fn home_dir_internal() -> RtResult<PathBuf> {
     if let Some(path) = env::home_dir() {
         Ok(path)
     } else {
@@ -67,7 +67,7 @@ fn home_dir_internal() -> AppResult<PathBuf> {
     }
 }
 
-fn rusty_tags_cache_dir_internal() -> AppResult<PathBuf> {
+fn rusty_tags_cache_dir_internal() -> RtResult<PathBuf> {
     let dir = try!(
         rusty_tags_dir()
             .map(Path::to_path_buf)
@@ -84,7 +84,7 @@ fn rusty_tags_cache_dir_internal() -> AppResult<PathBuf> {
     Ok(dir)
 }
 
-fn rusty_tags_dir_internal() -> AppResult<PathBuf> {
+fn rusty_tags_dir_internal() -> RtResult<PathBuf> {
     let dir = try!(
         home_dir().map(|mut d| {
             d.push(".rusty-tags");
@@ -99,7 +99,7 @@ fn rusty_tags_dir_internal() -> AppResult<PathBuf> {
     Ok(dir)
 }
 
-fn cargo_git_src_dir_internal() -> AppResult<PathBuf> {
+fn cargo_git_src_dir_internal() -> RtResult<PathBuf> {
     cargo_dir().map(|mut d| {
         d.push("git");
         d.push("checkouts");
@@ -107,7 +107,7 @@ fn cargo_git_src_dir_internal() -> AppResult<PathBuf> {
     })
 }
 
-fn cargo_crates_io_src_dir_internal() -> AppResult<PathBuf> {
+fn cargo_crates_io_src_dir_internal() -> RtResult<PathBuf> {
     let src_dir = try!(
         cargo_dir().map(|mut d| {
             d.push("registry");
@@ -126,7 +126,7 @@ fn cargo_crates_io_src_dir_internal() -> AppResult<PathBuf> {
     }
 }
 
-fn cargo_dir_internal() -> AppResult<PathBuf> {
+fn cargo_dir_internal() -> RtResult<PathBuf> {
     if let Ok(out) = Command::new("multirust").arg("show-override").output() {
         let output = try!(
             String::from_utf8(out.stdout)

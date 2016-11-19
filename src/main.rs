@@ -19,12 +19,12 @@ use std::io::{self, Write};
 use std::process::Command;
 use std::env;
 
-use app_result::AppResult;
+use rt_result::RtResult;
 use dependencies::read_dependencies;
 use tags::{update_tags, create_tags, move_tags};
 use config::Config;
 
-mod app_result;
+mod rt_result;
 mod dependencies;
 mod dirs;
 mod tags;
@@ -38,14 +38,14 @@ fn main() {
     });
 }
 
-fn execute() -> AppResult<()> {
+fn execute() -> RtResult<()> {
     let config = try!(Config::from_command_args());
     try!(update_all_tags(&config));
     let _ = try!(config.temp_dir.close());
     Ok(())
 }
 
-fn update_all_tags(config: &Config) -> AppResult<()> {
+fn update_all_tags(config: &Config) -> RtResult<()> {
     try!(fetch_source_of_dependencies(config));
     try!(update_std_lib_tags(&config));
 
@@ -54,7 +54,7 @@ fn update_all_tags(config: &Config) -> AppResult<()> {
     update_tags(&config, &dep_tree)
 }
 
-fn fetch_source_of_dependencies(config: &Config) -> AppResult<()> {
+fn fetch_source_of_dependencies(config: &Config) -> RtResult<()> {
     if ! config.quiet {
         println!("Fetching source of dependencies ...");
     }
@@ -69,7 +69,7 @@ fn fetch_source_of_dependencies(config: &Config) -> AppResult<()> {
 /// Searches for a directory containing a `Cargo.toml` file starting at
 /// `start_dir` and continuing the search upwards the directory tree
 /// until a directory is found.
-fn find_cargo_toml_dir(start_dir: &Path) -> AppResult<PathBuf> {
+fn find_cargo_toml_dir(start_dir: &Path) -> RtResult<PathBuf> {
     let mut dir = start_dir.to_path_buf();
     loop {
         if let Ok(files) = fs::read_dir(&dir) {
@@ -90,7 +90,7 @@ fn find_cargo_toml_dir(start_dir: &Path) -> AppResult<PathBuf> {
     }
 }
 
-fn update_std_lib_tags(config: &Config) -> AppResult<()> {
+fn update_std_lib_tags(config: &Config) -> RtResult<()> {
     let src_path_str = env::var("RUST_SRC_PATH");
     if ! src_path_str.is_ok() {
         return Ok(());

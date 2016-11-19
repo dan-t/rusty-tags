@@ -7,7 +7,7 @@ use toml;
 use rustc_serialize::Decodable;
 use tempdir::TempDir;
 use types::{TagsKind, TagsSpec};
-use app_result::AppResult;
+use rt_result::RtResult;
 use dirs;
 
 /// the configuration used to run rusty-tags
@@ -31,7 +31,7 @@ pub struct Config {
 }
 
 impl Config {
-   pub fn from_command_args() -> AppResult<Config> {
+   pub fn from_command_args() -> RtResult<Config> {
        let matches = App::new("rusty-tags")
            .about("Create ctags/etags for a cargo project and all of its dependencies")
            // Pull version from Cargo.toml
@@ -98,7 +98,7 @@ struct ConfigFromFile {
 }
 
 impl ConfigFromFile {
-    fn load() -> AppResult<Option<ConfigFromFile>> {
+    fn load() -> RtResult<Option<ConfigFromFile>> {
         let config_file = try!(dirs::rusty_tags_dir().map(|p| p.join("config.toml")));
         if ! config_file.is_file() {
             return Ok(None);
@@ -119,8 +119,8 @@ impl ConfigFromFile {
 
 /// Reads `file` into a string which is passed to the function `f`
 /// and its return value is returned by `map_file`.
-pub fn map_file<R, F>(file: &Path, f: F) -> AppResult<R>
-    where F: FnOnce(String) -> AppResult<R>
+pub fn map_file<R, F>(file: &Path, f: F) -> RtResult<R>
+    where F: FnOnce(String) -> RtResult<R>
 {
     let mut file = try!(File::open(file));
 

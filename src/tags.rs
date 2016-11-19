@@ -4,11 +4,11 @@ use std::process::Command;
 use std::collections::HashSet;
 use std::path::{PathBuf, Path};
 
-use app_result::AppResult;
+use rt_result::RtResult;
 use types::{TagsKind, SourceKind, DepTree};
 use config::Config;
 
-pub fn update_tags(config: &Config, dep_tree: &DepTree) -> AppResult<()> {
+pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
     let tags_files = try!(dep_tree.source.tags_files(&config.tags_spec));
     if ! dep_tree.source.is_root() && ! config.force_recreate && tags_files.are_files() {
         return Ok(());
@@ -78,7 +78,7 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> AppResult<()> {
 
 /// creates tags recursive for the directory hierarchies starting at `src_dirs`
 /// and writes them to `tags_file`
-pub fn create_tags<P: AsRef<Path>>(config: &Config, src_dirs: &[P], tags_file: &P) -> AppResult<()> {
+pub fn create_tags<P: AsRef<Path>>(config: &Config, src_dirs: &[P], tags_file: &P) -> RtResult<()> {
     let mut cmd = Command::new("ctags");
 
     config.tags_spec.ctags_option().map(|opt| { cmd.arg(opt); () });
@@ -130,7 +130,7 @@ pub fn create_tags<P: AsRef<Path>>(config: &Config, src_dirs: &[P], tags_file: &
     Ok(())
 }
 
-pub fn move_tags(config: &Config, from_tags: &Path, to_tags: &Path) -> AppResult<()> {
+pub fn move_tags(config: &Config, from_tags: &Path, to_tags: &Path) -> RtResult<()> {
     if config.verbose {
         println!("\nMove tags ...\n   from:\n      {}\n   to:\n      {}", from_tags.display(), to_tags.display());
     }
@@ -142,7 +142,7 @@ pub fn move_tags(config: &Config, from_tags: &Path, to_tags: &Path) -> AppResult
 fn reexported_deps(config: &Config,
                    source: &SourceKind,
                    deps: &[SourceKind])
-                   -> AppResult<Vec<SourceKind>> {
+                   -> RtResult<Vec<SourceKind>> {
     let tags_files = try!(source.tags_files(&config.tags_spec));
     let reexp_crates = try!(find_reexported_crates(&try!(tags_files.src_dir())));
     if reexp_crates.is_empty() {
@@ -173,7 +173,7 @@ fn merge_tags(config: &Config,
               lib_tag_file: &Path,
               dependency_tag_files: &[PathBuf],
               into_tag_file: &Path)
-              -> AppResult<()> {
+              -> RtResult<()> {
     if config.verbose {
         println!("\nMerging ...\n   tags:");
         println!("      {}", lib_tag_file.display());
@@ -257,7 +257,7 @@ type CrateName = String;
 
 /// searches in the file `<src_dir>/src/lib.rs` for external crates
 /// that are reexpored and returns their names
-fn find_reexported_crates(src_dir: &Path) -> AppResult<Vec<CrateName>> {
+fn find_reexported_crates(src_dir: &Path) -> RtResult<Vec<CrateName>> {
     let mut lib_file = src_dir.to_path_buf();
     lib_file.push("src");
     lib_file.push("lib.rs");
