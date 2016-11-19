@@ -1,3 +1,10 @@
+1.0.0
+-----
+* Always handle reexports of dependencies correctly, not only for the direct dependencies
+
+* Make tags file creation safe, which allows the running of multiple
+  rusty-tags processes at once without interfering with each other
+
 0.10.0
 ------
 * Support configuration of tags file name with '~/.rusty-tags/config.toml'
