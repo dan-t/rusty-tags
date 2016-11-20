@@ -1,3 +1,7 @@
+1.0.1
+-----
+* Handle missing platform specific dependencies
+
 1.0.0
 -----
 * Always handle reexports of dependencies correctly, not only for the direct dependencies
