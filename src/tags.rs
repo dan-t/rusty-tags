@@ -4,12 +4,28 @@ use std::process::Command;
 use std::collections::HashSet;
 use std::path::{PathBuf, Path};
 
-use rt_result::RtResult;
+use rt_result::{RtResult, RtErr};
 use types::{TagsKind, SourceKind, DepTree};
 use config::Config;
 
+macro_rules! try_and_handle_missing_source {
+    ($config:ident, $expr:expr) => (match $expr {
+        Ok(val) => val,
+        Err(RtErr::MissingSource(source)) => {
+            if $config.verbose {
+                println!("\nMissing source '{}', might be platform specific", source);
+            }
+
+            return Ok(())
+        }
+        Err(err) => {
+            return Err(From::from(err))
+        }
+    })
+}
+
 pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
-    let tags_files = try!(dep_tree.source.tags_files(&config.tags_spec));
+    let tags_files = try_and_handle_missing_source!(config, dep_tree.source.tags_files(&config.tags_spec));
     if ! dep_tree.source.is_root() && ! config.force_recreate && tags_files.are_files() {
         return Ok(());
     }
@@ -28,13 +44,13 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
     // might also contain the tags of dependencies if they're
     // reexported
     if let Some(cached_tags_file) = tags_files.cached_tags_file {
-        let reexp_deps = try!(reexported_deps(config,
-                                              &dep_tree.source,
-                                              &direct_deps));
+        let reexp_deps = try_and_handle_missing_source!(config, reexported_deps(config,
+                                                                                &dep_tree.source,
+                                                                                &direct_deps));
 
         let mut reexp_tags_files = Vec::new();
         for rdep in &reexp_deps {
-            let tags_files = try!(rdep.tags_files(&config.tags_spec));
+            let tags_files = try_and_handle_missing_source!(config, rdep.tags_files(&config.tags_spec));
             if let Some(file) = tags_files.cached_tags_file {
                 reexp_tags_files.push(file);
             }
@@ -55,7 +71,7 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
     {
         let mut dep_tags_files = Vec::new();
         for dep in &direct_deps {
-            let tags_files = try!(dep.tags_files(&config.tags_spec));
+            let tags_files = try_and_handle_missing_source!(config, dep.tags_files(&config.tags_spec));
             if let Some(file) = tags_files.cached_tags_file {
                 dep_tags_files.push(file);
             }

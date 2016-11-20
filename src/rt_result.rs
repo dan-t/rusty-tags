@@ -22,7 +22,7 @@ impl Display for RtErr {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
         match self {
             &RtErr::Message(ref msg)            => writeln!(f, "{}", msg),
-            &RtErr::MissingSource(ref src_kind) => writeln!(f, "{}", src_kind)
+            &RtErr::MissingSource(ref src_kind) => writeln!(f, "Missing source of '{}'", src_kind)
         }
     }
 }
