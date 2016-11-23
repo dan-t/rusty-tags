@@ -1,7 +1,3 @@
-// to silence a bogus warning about `tag_dir` being unused
-#![allow(unused_assignments)]
-#![allow(dead_code)]
-
 extern crate toml;
 extern crate glob;
 extern crate rustc_serialize;
