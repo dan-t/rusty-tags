@@ -1,3 +1,4 @@
+use libc;
 use std::fs::{File, OpenOptions, copy, rename, remove_file};
 use std::io::{Read, Write};
 use std::process::Command;
@@ -151,7 +152,19 @@ pub fn move_tags(config: &Config, from_tags: &Path, to_tags: &Path) -> RtResult<
         println!("\nMove tags ...\n   from:\n      {}\n   to:\n      {}", from_tags.display(), to_tags.display());
     }
 
-    let _ = try!(rename(from_tags, to_tags));
+    if let Err(err) = rename(from_tags, to_tags) {
+        if let Some(err_raw) = err.raw_os_error() {
+            match err_raw {
+                libc::EXDEV => {
+                    try!(copy(from_tags, to_tags));
+                    try!(remove_file(from_tags));
+                },
+                _ => return Err(From::from(err)),
+            }
+        } else {
+            return Err(From::from(err));
+        }
+    }
     Ok(())
 }
 

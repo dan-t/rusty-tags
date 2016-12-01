@@ -1,3 +1,4 @@
+extern crate libc;
 extern crate toml;
 extern crate glob;
 extern crate rustc_serialize;
