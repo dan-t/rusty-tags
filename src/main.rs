@@ -14,6 +14,7 @@ use std::path::{PathBuf, Path};
 use std::io::{self, Write};
 use std::process::Command;
 use std::env;
+use tempdir::TempDir;
 
 use rt_result::RtResult;
 use dependencies::read_dependencies;
@@ -130,8 +131,13 @@ fn update_std_lib_tags(config: &Config) -> RtResult<()> {
         }
     }
 
-    let tmp_std_lib_tags = config.temp_file("std_lib_tags");
+    let temp_dir = try!(TempDir::new_in(&src_path, "std-lib-temp-dir"));
+    let tmp_std_lib_tags = temp_dir.path().join("std_lib_tags");
+
     try!(create_tags(config, &src_dirs, &tmp_std_lib_tags));
     try!(move_tags(config, &tmp_std_lib_tags, &std_lib_tags));
+
+    try!(temp_dir.close());
+
     Ok(())
 }
