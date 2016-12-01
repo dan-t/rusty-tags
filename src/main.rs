@@ -38,7 +38,7 @@ fn main() {
 fn execute() -> RtResult<()> {
     let config = try!(Config::from_command_args());
     try!(update_all_tags(&config));
-    let _ = try!(config.temp_dir.close());
+    let _ = try!(config.close_temp_dirs());
     Ok(())
 }
 

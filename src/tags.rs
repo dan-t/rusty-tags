@@ -34,7 +34,7 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
         try!(update_tags(config, dep))
     }
 
-    let tmp_src_tags = config.temp_file("src_tags");
+    let tmp_src_tags = try!(config.source_temp_file("src_tags"));
     let src_dir = try!(tags_files.src_dir());
     try!(create_tags(config, &[&src_dir], &&tmp_src_tags));
 
@@ -56,7 +56,7 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
             }
         }
 
-        let tmp_cached_tags = config.temp_file("cached_tags");
+        let tmp_cached_tags = try!(config.cache_temp_file("cached_tags"));
         if ! reexp_tags_files.is_empty() {
             try!(merge_tags(config, &tmp_src_tags, &reexp_tags_files, &tmp_cached_tags));
         } else {
@@ -77,14 +77,19 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
             }
         }
 
-        let tmp_src_and_deps_tags = config.temp_file("src_and_deps_tags");
-        if ! dep_tags_files.is_empty() {
-            try!(merge_tags(config, &tmp_src_tags, &dep_tags_files, &tmp_src_and_deps_tags));
+        let tmp_src_and_dep_tags = if dep_tree.source.is_root() {
+            try!(config.source_temp_file("root_tags"))
         } else {
-            try!(copy(&tmp_src_tags, &tmp_src_and_deps_tags));
+            try!(config.cargo_temp_file("cargo_tags"))
+        };
+
+        if ! dep_tags_files.is_empty() {
+            try!(merge_tags(config, &tmp_src_tags, &dep_tags_files, &tmp_src_and_dep_tags));
+        } else {
+            try!(copy(&tmp_src_tags, &tmp_src_and_dep_tags));
         }
 
-        try!(move_tags(config, &tmp_src_and_deps_tags, &tags_files.src_tags_file));
+        try!(move_tags(config, &tmp_src_and_dep_tags, &tags_files.src_tags_file));
     }
 
     try!(remove_file(&tmp_src_tags));

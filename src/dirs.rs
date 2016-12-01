@@ -31,6 +31,11 @@ pub fn rusty_tags_cache_dir() -> RtResult<&'static Path> {
         .map_err(|err| err.clone())
 }
 
+/// the root directory of cargo
+pub fn cargo_dir() -> RtResult<PathBuf> {
+    CARGO_DIR.clone()
+}
+
 /// where cargo puts its git checkouts
 pub fn cargo_git_src_dir() -> RtResult<&'static Path> {
     CARGO_GIT_SRC_DIR
@@ -53,10 +58,6 @@ pub fn glob_path(pattern: &String) -> RtResult<Paths> {
 
 fn home_dir() -> RtResult<PathBuf> {
     HOME_DIR.clone()
-}
-
-fn cargo_dir() -> RtResult<PathBuf> {
-    CARGO_DIR.clone()
 }
 
 fn home_dir_internal() -> RtResult<PathBuf> {
