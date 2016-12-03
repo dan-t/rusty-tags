@@ -1,3 +1,7 @@
+1.1.0
+-----
+* Fix issues with moving of tag files across filesystem/partition boundaries
+
 1.0.1
 -----
 * Handle missing platform specific dependencies
