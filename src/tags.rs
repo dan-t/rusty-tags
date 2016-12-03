@@ -60,7 +60,7 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
         if ! reexp_tags_files.is_empty() {
             try!(merge_tags(config, &tmp_src_tags, &reexp_tags_files, &tmp_cached_tags));
         } else {
-            try!(copy(&tmp_src_tags, &tmp_cached_tags));
+            try!(copy_tags(config, &tmp_src_tags, &tmp_cached_tags));
         }
 
         try!(move_tags(config, &tmp_cached_tags, &cached_tags_file));
@@ -86,7 +86,7 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
         if ! dep_tags_files.is_empty() {
             try!(merge_tags(config, &tmp_src_tags, &dep_tags_files, &tmp_src_and_dep_tags));
         } else {
-            try!(copy(&tmp_src_tags, &tmp_src_and_dep_tags));
+            try!(copy_tags(config, &tmp_src_tags, &tmp_src_and_dep_tags));
         }
 
         try!(move_tags(config, &tmp_src_and_dep_tags, &tags_files.src_tags_file));
@@ -151,6 +151,15 @@ pub fn create_tags<P: AsRef<Path>>(config: &Config, src_dirs: &[P], tags_file: &
     Ok(())
 }
 
+pub fn copy_tags(config: &Config, from_tags: &Path, to_tags: &Path) -> RtResult<()> {
+    if config.verbose {
+        println!("\nCopy tags ...\n   from:\n      {}\n   to:\n      {}", from_tags.display(), to_tags.display());
+    }
+
+    let _ = try!(copy(from_tags, to_tags));
+    Ok(())
+}
+
 pub fn move_tags(config: &Config, from_tags: &Path, to_tags: &Path) -> RtResult<()> {
     if config.verbose {
         println!("\nMove tags ...\n   from:\n      {}\n   to:\n      {}", from_tags.display(), to_tags.display());
@@ -171,7 +180,7 @@ fn reexported_deps(config: &Config,
     }
 
     if config.verbose {
-        println!("Found public reexports in '{}' of:", source.get_lib_name());
+        println!("\nFound public reexports in '{}' of:", source.get_lib_name());
         for rcrate in reexp_crates.iter() {
             println!("   {}", rcrate);
         }
@@ -253,7 +262,7 @@ fn merge_tags(config: &Config,
 
         TagsKind::Emacs => {
             if lib_tag_file != into_tag_file {
-                try!(copy(lib_tag_file, into_tag_file));
+                try!(copy_tags(config, lib_tag_file, into_tag_file));
             }
 
             let mut tag_file = try!(OpenOptions::new()
