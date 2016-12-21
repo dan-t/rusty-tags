@@ -1,3 +1,9 @@
+1.1.1
+-----
+* Try to support cargo workspaces
+* Better handling of missing 'cargo' executable
+* Better handling of missing '~/.cargo' directory
+
 1.1.0
 -----
 * Fix issues with moving of tag files across filesystem/partition boundaries
