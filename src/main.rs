@@ -46,8 +46,9 @@ fn update_all_tags(config: &Config) -> RtResult<()> {
     try!(fetch_source_of_dependencies(config));
     try!(update_std_lib_tags(&config));
 
-    let cargo_dir = try!(find_cargo_toml_dir(&config.start_dir));
-    let dep_tree = try!(read_dependencies(&cargo_dir));
+    let cargo_toml = try!(find_file_upwards("Cargo.toml", &config.start_dir));
+    let cargo_lock = try!(find_file_upwards("Cargo.lock", &config.start_dir));
+    let dep_tree = try!(read_dependencies(&cargo_toml, &cargo_lock));
     update_tags(&config, &dep_tree)
 }
 
@@ -74,26 +75,26 @@ fn fetch_source_of_dependencies(config: &Config) -> RtResult<()> {
     Ok(())
 }
 
-/// Searches for a directory containing a `Cargo.toml` file starting at
-/// `start_dir` and continuing the search upwards the directory tree
-/// until a directory is found.
-fn find_cargo_toml_dir(start_dir: &Path) -> RtResult<PathBuf> {
+/// Searches for a file named 'file_name' starting at `start_dir` and continuing the search upwards
+/// the directory tree until the file is found.
+fn find_file_upwards(file_name: &str, start_dir: &Path) -> RtResult<PathBuf> {
     let mut dir = start_dir.to_path_buf();
     loop {
         if let Ok(files) = fs::read_dir(&dir) {
-            for file in files {
-                if let Ok(file) = file {
-                    if file.path().is_file() {
-                        if let Some("Cargo.toml") = file.path().file_name().and_then(|s| s.to_str()) {
-                            return Ok(dir);
-                        }
-                    }
+            for path in files.map(|r| r.map(|d| d.path())) {
+                match path {
+                    Ok(ref path) if path.is_file() =>
+                        match path.file_name() {
+                            Some(name) if name.to_str() == Some(file_name) => return Ok(path.to_path_buf()),
+                            _ => continue
+                        },
+                    _ => continue
                 }
             }
         }
 
         if ! dir.pop() {
-            return Err(format!("Couldn't find 'Cargo.toml' starting at directory '{}'!", start_dir.display()).into());
+            return Err(format!("Couldn't find '{}' starting at directory '{}'!", file_name, start_dir.display()).into());
         }
     }
 }

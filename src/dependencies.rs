@@ -7,8 +7,11 @@ use rt_result::RtResult;
 use types::{DepTree, SourceKind};
 
 /// Returns the dependency tree of the cargo project.
-pub fn read_dependencies(cargo_toml_dir: &Path) -> RtResult<DepTree> {
-    let toml_table = try!(parse_toml(&cargo_toml_dir.join("Cargo.toml")));
+pub fn read_dependencies(cargo_toml: &Path, cargo_lock: &Path) -> RtResult<DepTree> {
+    let cargo_toml_dir = try!(cargo_toml.parent()
+        .ok_or(format!("Couldn't get directory of file '{}'!", cargo_toml.display())));
+
+    let toml_table = try!(parse_toml(&cargo_toml));
 
     // The direct dependencies of the cargo project have to be handeled differently then the
     // indirect ones - the dependencies of the dependencies - because the path for
@@ -22,7 +25,7 @@ pub fn read_dependencies(cargo_toml_dir: &Path) -> RtResult<DepTree> {
         });
     }
 
-    let lock_table = try!(parse_toml(&cargo_toml_dir.join("Cargo.lock")));
+    let lock_table = try!(parse_toml(&cargo_lock));
 
     let packages: Vec<&toml::Table> = try!(
         lock_table.get("package")
