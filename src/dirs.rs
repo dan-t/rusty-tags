@@ -128,6 +128,15 @@ fn cargo_crates_io_src_dir_internal() -> RtResult<PathBuf> {
 }
 
 fn cargo_dir_internal() -> RtResult<PathBuf> {
+    let cargo_dir = try!(get_cargo_dir());
+    if ! cargo_dir.is_dir() {
+        try!(fs::create_dir_all(&cargo_dir));
+    }
+
+    Ok(cargo_dir)
+}
+
+fn get_cargo_dir() -> RtResult<PathBuf> {
     if let Ok(out) = Command::new("multirust").arg("show-override").output() {
         let output = try!(
             String::from_utf8(out.stdout)
