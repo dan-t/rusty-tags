@@ -75,7 +75,7 @@ fn fetch_source_of_dependencies(config: &Config) -> RtResult<()> {
     Ok(())
 }
 
-/// Searches for a file named 'file_name' starting at `start_dir` and continuing the search upwards
+/// Searches for a file named `file_name` starting at `start_dir` and continuing the search upwards
 /// the directory tree until the file is found.
 fn find_file_upwards(file_name: &str, start_dir: &Path) -> RtResult<PathBuf> {
     let mut dir = start_dir.to_path_buf();
