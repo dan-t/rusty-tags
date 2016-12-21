@@ -59,7 +59,18 @@ fn fetch_source_of_dependencies(config: &Config) -> RtResult<()> {
     let mut cmd = Command::new("cargo");
     cmd.arg("fetch");
 
-    let _ = try!(cmd.output());
+    let output = try!(cmd.output()
+        .map_err(|err| format!("'cargo' execution failed: {}\nIs 'cargo' correctly installed?", err)));
+
+    if ! output.status.success() {
+        let mut msg = String::from_utf8_lossy(&output.stderr).into_owned();
+        if msg.is_empty() {
+            msg = String::from_utf8_lossy(&output.stdout).into_owned();
+        }
+
+        return Err(msg.into());
+    }
+
     Ok(())
 }
 
