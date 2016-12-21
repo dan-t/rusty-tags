@@ -133,7 +133,7 @@ pub fn create_tags<P: AsRef<Path>>(config: &Config, src_dirs: &[P], tags_file: &
     }
 
     let output = try!(cmd.output()
-        .map_err(|err| format!("ctags execution failed: {}", err)));
+        .map_err(|err| format!("'ctags' execution failed: {}\nIs 'ctags' correctly installed?", err)));
 
     if ! output.status.success() {
         let mut msg = String::from_utf8_lossy(&output.stderr).into_owned();
