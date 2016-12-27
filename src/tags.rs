@@ -35,8 +35,7 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
     }
 
     let tmp_src_tags = try!(config.source_temp_file("src_tags"));
-    let src_dir = try!(tags_files.src_dir());
-    try!(create_tags(config, &[&src_dir], &&tmp_src_tags));
+    try!(create_tags(config, &[&tags_files.src_dir], &&tmp_src_tags));
 
     let direct_deps = dep_tree.direct_dep_sources();
 
@@ -174,7 +173,7 @@ fn reexported_deps(config: &Config,
                    deps: &[SourceKind])
                    -> RtResult<Vec<SourceKind>> {
     let tags_files = try!(source.tags_files(&config.tags_spec));
-    let reexp_crates = try!(find_reexported_crates(&try!(tags_files.src_dir())));
+    let reexp_crates = try!(find_reexported_crates(&tags_files.src_dir));
     if reexp_crates.is_empty() {
         return Ok(Vec::new());
     }
@@ -285,13 +284,10 @@ fn merge_tags(config: &Config,
 
 type CrateName = String;
 
-/// searches in the file `<src_dir>/src/lib.rs` for external crates
+/// searches in the file `<src_dir>/lib.rs` for external crates
 /// that are reexpored and returns their names
 fn find_reexported_crates(src_dir: &Path) -> RtResult<Vec<CrateName>> {
-    let mut lib_file = src_dir.to_path_buf();
-    lib_file.push("src");
-    lib_file.push("lib.rs");
-
+    let lib_file = src_dir.join("lib.rs");
     if ! lib_file.is_file() {
         return Ok(Vec::new());
     }

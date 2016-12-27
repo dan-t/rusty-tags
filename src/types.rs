@@ -56,9 +56,11 @@ pub enum SourceKind {
 
 impl SourceKind {
     pub fn tags_files(&self, tags_spec: &TagsSpec) -> RtResult<TagsFiles> {
+        let src_root_dir = try!(self.src_root_dir());
         Ok(TagsFiles {
             cached_tags_file: try!(self.cached_tags_file(tags_spec)),
-            src_tags_file: try!(self.src_tags_file(tags_spec))
+            src_tags_file: src_root_dir.join(tags_spec.file_name()),
+            src_dir: src_root_dir.join("src")
         })
     }
 
@@ -95,10 +97,6 @@ impl SourceKind {
         } else {
             Ok(None)
         }
-    }
-
-    fn src_tags_file(&self, tags_spec: &TagsSpec) -> RtResult<PathBuf> {
-        Ok(try!(self.src_root_dir()).join(tags_spec.file_name()))
     }
 
     /// find the root source directory, for git sources the directories
@@ -222,7 +220,8 @@ impl Display for SourceKind {
 
 pub struct TagsFiles {
     pub cached_tags_file: Option<PathBuf>,
-    pub src_tags_file: PathBuf
+    pub src_tags_file: PathBuf,
+    pub src_dir: PathBuf
 }
 
 impl TagsFiles {
@@ -234,14 +233,6 @@ impl TagsFiles {
         }
 
         self.src_tags_file.is_file()
-    }
-
-    pub fn src_dir(&self) -> RtResult<PathBuf> {
-        if let Some(path) = self.src_tags_file.parent() {
-            return Ok(path.to_path_buf());
-        }
-
-        Err(format!("Can't get directory of path: '{}'", self.src_tags_file.display()).into())
     }
 }
 
