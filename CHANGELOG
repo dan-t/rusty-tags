@@ -1,3 +1,7 @@
+1.2.0
+-----
+* Only create tags for rust files under the 'src' directory
+
 1.1.1
 -----
 * Try to support cargo workspaces
