@@ -110,15 +110,12 @@ impl SourceKind {
 
                 let src_dir = try!(cargo_git_src_dir())
                     .join(&lib_src)
-                    .join("master");
+                    .join(commit_hash);
 
                 let src_paths = try!(glob_path(&format!("{}", src_dir.display())));
                 for src_path in src_paths {
                     if let Ok(path) = src_path {
-                        let src_commit_hash = try!(get_commit_hash(&path));
-                        if *commit_hash == src_commit_hash {
-                            return Ok(path);
-                        }
+                        return Ok(path);
                     }
                 }
 
@@ -127,15 +124,12 @@ impl SourceKind {
                 // for the one with a matching commit hash
                 let src_dir = try!(cargo_git_src_dir())
                     .join("*")
-                    .join("master");
+                    .join(commit_hash);
 
                 let src_paths = try!(glob_path(&format!("{}", src_dir.display())));
                 for src_path in src_paths {
                     if let Ok(path) = src_path {
-                        let src_commit_hash = try!(get_commit_hash(&path));
-                        if *commit_hash == src_commit_hash {
-                            return Ok(path);
-                        }
+                        return Ok(path);
                     }
                 }
 
