@@ -1,6 +1,5 @@
 use std::fmt::{Debug, Display, Formatter, Error};
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::path::PathBuf;
 use rt_result::RtResult;
 
 use dirs::{
@@ -284,19 +283,4 @@ impl TagsSpec {
             TagsKind::Emacs => Some("-e")
         }
     }
-}
-
-/// get the commit hash of the current `HEAD` of the git repository located at `git_dir`
-fn get_commit_hash(git_dir: &Path) -> RtResult<String> {
-    let mut cmd = Command::new("git");
-    cmd.current_dir(git_dir)
-        .arg("rev-parse")
-        .arg("HEAD");
-
-    let out = try!(cmd.output()
-        .map_err(|err| format!("git execution failed: {}", err)));
-
-    String::from_utf8(out.stdout)
-        .map(|s| s.trim().to_string())
-        .map_err(|_| "Couldn't convert 'git rev-parse HEAD' output to utf8!".into())
 }
