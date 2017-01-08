@@ -36,9 +36,6 @@ jumping further to its dependencies is possible.
 If a dependency reexports parts of its own dependencies, then these reexported
 parts are also contained in the tags file of the dependency.
 
-Currently dependency overrides aren't supported and local path dependencies are
-only supported if they're contained in the `Cargo.toml` of the root cargo project.
-
 Rust Standard Library Support
 =============================
 
