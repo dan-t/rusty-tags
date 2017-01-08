@@ -1,5 +1,4 @@
 extern crate toml;
-extern crate glob;
 extern crate rustc_serialize;
 extern crate tempdir;
 
@@ -9,15 +8,15 @@ extern crate clap;
 #[macro_use]
 extern crate lazy_static;
 
-use std::fs;
-use std::path::{PathBuf, Path};
+use std::path::Path;
 use std::io::{self, Write};
 use std::process::Command;
 use std::env;
 use tempdir::TempDir;
+use rustc_serialize::json::Json;
 
 use rt_result::RtResult;
-use dependencies::read_dependencies;
+use dependencies::dependency_trees;
 use tags::{update_tags, create_tags, move_tags};
 use config::Config;
 
@@ -43,22 +42,30 @@ fn execute() -> RtResult<()> {
 }
 
 fn update_all_tags(config: &Config) -> RtResult<()> {
-    try!(fetch_source_of_dependencies(config));
+    let metadata = try!(fetch_source_and_metadata(&config));
     try!(update_std_lib_tags(&config));
 
-    let cargo_toml = try!(find_file_upwards("Cargo.toml", &config.start_dir));
-    let cargo_lock = try!(find_file_upwards("Cargo.lock", &config.start_dir));
-    let dep_tree = try!(read_dependencies(&cargo_toml, &cargo_lock));
-    update_tags(&config, &dep_tree)
-}
+    let dep_trees = try!(dependency_trees(&config, &metadata));
+    for tree in &dep_trees {
+        if ! config.quiet {
+            println!("Creating tags for '{}' ...", tree.source.name);
+        }
 
-fn fetch_source_of_dependencies(config: &Config) -> RtResult<()> {
-    if ! config.quiet {
-        println!("Fetching source of dependencies ...");
+        try!(update_tags(&config, &tree));
     }
 
+    Ok(())
+}
+
+fn fetch_source_and_metadata(config: &Config) -> RtResult<Json> {
+    if ! config.quiet {
+        println!("Fetching source and metadata ...");
+    }
+
+    try!(env::set_current_dir(&config.start_dir));
+
     let mut cmd = Command::new("cargo");
-    cmd.arg("fetch");
+    cmd.arg("metadata");
 
     let output = try!(cmd.output()
         .map_err(|err| format!("'cargo' execution failed: {}\nIs 'cargo' correctly installed?", err)));
@@ -72,31 +79,7 @@ fn fetch_source_of_dependencies(config: &Config) -> RtResult<()> {
         return Err(msg.into());
     }
 
-    Ok(())
-}
-
-/// Searches for a file named `file_name` starting at `start_dir` and continuing the search upwards
-/// the directory tree until the file is found.
-fn find_file_upwards(file_name: &str, start_dir: &Path) -> RtResult<PathBuf> {
-    let mut dir = start_dir.to_path_buf();
-    loop {
-        if let Ok(files) = fs::read_dir(&dir) {
-            for path in files.map(|r| r.map(|d| d.path())) {
-                match path {
-                    Ok(ref path) if path.is_file() =>
-                        match path.file_name() {
-                            Some(name) if name.to_str() == Some(file_name) => return Ok(path.to_path_buf()),
-                            _ => continue
-                        },
-                    _ => continue
-                }
-            }
-        }
-
-        if ! dir.pop() {
-            return Err(format!("Couldn't find '{}' starting at directory '{}'!", file_name, start_dir.display()).into());
-        }
-    }
+    Ok(try!(Json::from_str(&String::from_utf8_lossy(&output.stdout))))
 }
 
 fn update_std_lib_tags(config: &Config) -> RtResult<()> {
@@ -145,6 +128,10 @@ fn update_std_lib_tags(config: &Config) -> RtResult<()> {
 
     let temp_dir = try!(TempDir::new_in(&src_path, "std-lib-temp-dir"));
     let tmp_std_lib_tags = temp_dir.path().join("std_lib_tags");
+
+    if ! config.quiet {
+        println!("Creating tags for the standard library ...");
+    }
 
     try!(create_tags(config, &src_dirs, &tmp_std_lib_tags));
     try!(move_tags(config, &tmp_std_lib_tags, &std_lib_tags));

@@ -1,231 +1,73 @@
-use std::fmt::{Debug, Display, Formatter, Error};
-use std::path::PathBuf;
-use rt_result::RtResult;
+use std::path::{Path, PathBuf};
+use std::fs;
+use std::hash::{Hash, Hasher};
+use std::collections::hash_map::DefaultHasher;
 
-use dirs::{
-    cargo_git_src_dir,
-    cargo_crates_io_src_dir,
-    rusty_tags_cache_dir,
-    glob_path
-};
+use rt_result::RtResult;
+use dirs::rusty_tags_cache_dir;
 
 /// the tree describing the dependencies of the whole cargo project
 #[derive(Debug)]
 pub struct DepTree {
-    pub source: SourceKind,
+    pub source: Source,
     pub dependencies: Vec<Box<DepTree>>
 }
 
 impl DepTree {
-    pub fn direct_dep_sources(&self) -> Vec<SourceKind> {
-        let mut srcs = Vec::new();
-        for dep in &self.dependencies {
-            srcs.push(dep.source.clone());
-        }
-
-        srcs
+    pub fn direct_dep_sources(&self) -> Vec<&Source> {
+        self.dependencies.iter()
+            .map(|d| &d.source)
+            .collect()
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SourceKind {
     /// the source of the cargo project
-    Root {
-        path: PathBuf
-    },
+    Root,
 
-    /// the source of a dependency from a git repository
-    Git {
-        lib_name: String,
-        commit_hash: String
-    },
-
-    /// the source of a dependency from crates.io
-    CratesIo {
-        lib_name: String,
-        version: String
-    },
-
-    /// the source of a dependency from a local directory
-    Path {
-        lib_name: String,
-        path: PathBuf
-    }
+    /// the source of a dependency
+    Dep
 }
 
-impl SourceKind {
-    pub fn tags_files(&self, tags_spec: &TagsSpec) -> RtResult<TagsFiles> {
-        let src_root_dir = try!(self.src_root_dir());
-        Ok(TagsFiles {
-            cached_tags_file: try!(self.cached_tags_file(tags_spec)),
-            src_tags_file: src_root_dir.join(tags_spec.file_name()),
-            src_dir: src_root_dir.join("src")
+#[derive(Clone, Debug)]
+pub struct Source {
+    pub kind: SourceKind,
+    pub name: String,
+    pub dir: PathBuf,
+    pub tags_file: PathBuf,
+    pub cached_tags_file: Option<PathBuf>
+}
+
+impl Source {
+    pub fn new(kind: SourceKind, name: &str, dir: &Path, tags_spec: &TagsSpec) -> RtResult<Source> {
+        let cargo_toml_dir = try!(find_dir_upwards_containing("Cargo.toml", dir));
+        let tags_file = cargo_toml_dir.join(tags_spec.file_name());
+
+        let cached_tags_file = if kind == SourceKind::Dep {
+            let cache_dir = try!(rusty_tags_cache_dir());
+            Some(cache_dir.join(format!("{}-{}.{}", name, hash(dir), tags_spec.file_extension())))
+        } else {
+            None
+        };
+
+        Ok(Source {
+            kind: kind,
+            name: name.to_owned(),
+            dir: dir.to_owned(),
+            tags_file: tags_file,
+            cached_tags_file: cached_tags_file
         })
     }
 
-    pub fn get_lib_name(&self) -> &str {
-        match *self {
-            SourceKind::Root { .. } => {
-                "project root"
-            }
-
-            SourceKind::Git { ref lib_name, .. } => {
-                lib_name
-            }
-
-            SourceKind::CratesIo { ref lib_name, .. } => {
-                lib_name
-            }
-
-            SourceKind::Path { ref lib_name, .. } => {
-                lib_name
-            }
-        }
-    }
-
-    pub fn is_root(&self) -> bool {
-        match *self {
-            SourceKind::Root { .. } => true,
-            _ => false
-        }
-    }
-
-    fn cached_tags_file(&self, tags_spec: &TagsSpec) -> RtResult<Option<PathBuf>> {
-        if let Some(name) = self.cached_tags_file_name(tags_spec) {
-            Ok(Some(try!(rusty_tags_cache_dir()).join(name)))
-        } else {
-            Ok(None)
-        }
-    }
-
-    /// find the root source directory, for git sources the directories
-    /// in `~/.cargo/git/checkouts` are considered and for crates.io sources
-    /// the directories in `~/.cargo/registry/src/github.com-*` are considered
-    fn src_root_dir(&self) -> RtResult<PathBuf> {
-        match *self {
-            SourceKind::Git { ref lib_name, ref commit_hash } => {
-                let mut lib_src = lib_name.clone();
-                lib_src.push_str("-*");
-
-                let src_dir = try!(cargo_git_src_dir())
-                    .join(&lib_src)
-                    .join(commit_hash);
-
-                let src_paths = try!(glob_path(&format!("{}", src_dir.display())));
-                for src_path in src_paths {
-                    if let Ok(path) = src_path {
-                        return Ok(path);
-                    }
-                }
-
-                // the git repository name hasn't to match the name of the library,
-                // so here we're just going through all git directories and searching
-                // for the one with a matching commit hash
-                let src_dir = try!(cargo_git_src_dir())
-                    .join("*")
-                    .join(commit_hash);
-
-                let src_paths = try!(glob_path(&format!("{}", src_dir.display())));
-                for src_path in src_paths {
-                    if let Ok(path) = src_path {
-                        return Ok(path);
-                    }
-                }
-
-                Err(self.into())
-            },
-
-            SourceKind::CratesIo { ref lib_name, ref version } => {
-                let mut lib_src = lib_name.clone();
-                lib_src.push('-');
-                lib_src.push_str(&**version);
-
-                let src_dir = try!(cargo_crates_io_src_dir())
-                    .join(&lib_src);
-
-                if ! src_dir.is_dir() {
-                    return Err(self.into());
-                }
-
-                Ok(src_dir)
-            },
-
-            SourceKind::Path { ref path, .. } => {
-                if ! path.is_dir() {
-                    return Err(self.into());
-                }
-
-                Ok(path.clone())
-            }
-
-            SourceKind::Root { ref path } => {
-                Ok(path.clone())
-            }
-        }
-    }
-
-    fn cached_tags_file_name(&self, tags_spec: &TagsSpec) -> Option<String> {
-        match *self {
-            SourceKind::Git { ref lib_name, ref commit_hash } => {
-                Some(format!("{}-{}.{}", lib_name, commit_hash, tags_spec.file_extension()))
-            }
-
-            SourceKind::CratesIo { ref lib_name, ref version } => {
-                Some(format!("{}-{}.{}", lib_name, version, tags_spec.file_extension()))
-            }
-
-            SourceKind::Path { .. } | SourceKind::Root { .. } => None
-        }
-    }
-
-    fn display(&self, f: &mut Formatter) -> Result<(), Error> {
-        match *self {
-            SourceKind::Root { ref path } => {
-                write!(f, "project root: {}", path.display())
-            }
-
-            SourceKind::Git { ref lib_name, ref commit_hash } => {
-                write!(f, "{}-{}", lib_name, commit_hash)
-            }
-
-            SourceKind::CratesIo { ref lib_name, ref version } => {
-                write!(f, "{}-{}", lib_name, version)
-            }
-
-            SourceKind::Path { ref lib_name, ref path } => {
-                write!(f, "{}: {}", lib_name, path.display())
-            }
-        }
-    }
-}
-
-impl Debug for SourceKind {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        self.display(f)
-    }
-}
-
-impl Display for SourceKind {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        self.display(f)
-    }
-}
-
-pub struct TagsFiles {
-    pub cached_tags_file: Option<PathBuf>,
-    pub src_tags_file: PathBuf,
-    pub src_dir: PathBuf
-}
-
-impl TagsFiles {
-    pub fn are_files(&self) -> bool {
+    pub fn are_tags_files_present(&self) -> bool {
         if let Some(ref file) = self.cached_tags_file {
             if ! file.is_file() {
                 return false;
             }
         }
 
-        self.src_tags_file.is_file()
+        self.tags_file.is_file()
     }
 }
 
@@ -281,6 +123,34 @@ impl TagsSpec {
         match self.kind {
             TagsKind::Vi    => None,
             TagsKind::Emacs => Some("-e")
+        }
+    }
+}
+
+fn hash(path: &Path) -> String {
+    let mut hasher = DefaultHasher::new();
+    path.hash(&mut hasher);
+    hasher.finish().to_string()
+}
+
+fn find_dir_upwards_containing(file_name: &str, start_dir: &Path) -> RtResult<PathBuf> {
+    let mut dir = start_dir.to_path_buf();
+    loop {
+        if let Ok(files) = fs::read_dir(&dir) {
+            for path in files.map(|r| r.map(|d| d.path())) {
+                match path {
+                    Ok(ref path) if path.is_file() =>
+                        match path.file_name() {
+                            Some(name) if name.to_str() == Some(file_name) => return Ok(dir),
+                            _ => continue
+                        },
+                    _ => continue
+                }
+            }
+        }
+
+        if ! dir.pop() {
+            return Err(format!("Couldn't find '{}' starting at directory '{}'!", file_name, start_dir.display()).into());
         }
     }
 }

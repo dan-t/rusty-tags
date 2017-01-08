@@ -2,39 +2,16 @@ use std::fs::{File, OpenOptions, copy, rename, remove_file};
 use std::io::{Read, Write};
 use std::process::Command;
 use std::collections::HashSet;
-use std::path::{PathBuf, Path};
+use std::path::Path;
 
-use rt_result::{RtResult, RtErr};
-use types::{TagsKind, SourceKind, DepTree};
+use rt_result::RtResult;
+use types::{TagsKind, Source, SourceKind, DepTree};
 use config::Config;
 
-macro_rules! try_and_handle_missing_source {
-    ($config:ident, $expr:expr) => (match $expr {
-        Ok(val) => val,
-        Err(RtErr::MissingSource(source)) => {
-            if $config.verbose {
-                println!("\nMissing source '{}', might be platform specific", source);
-            }
-
-            return Ok(())
-        }
-        Err(err) => {
-            return Err(From::from(err))
-        }
-    })
-}
-
-macro_rules! try_and_contine_one_missing_source {
-    ($expr:expr) => (match $expr {
-        Ok(val) => val,
-        Err(RtErr::MissingSource(_)) => continue,
-        Err(err) => return Err(From::from(err))
-    })
-}
-
 pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
-    let tags_files = try_and_handle_missing_source!(config, dep_tree.source.tags_files(&config.tags_spec));
-    if ! dep_tree.source.is_root() && ! config.force_recreate && tags_files.are_files() {
+    if dep_tree.source.are_tags_files_present()
+        && dep_tree.source.kind != SourceKind::Root
+        && ! config.force_recreate {
         return Ok(());
     }
 
@@ -43,20 +20,19 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
     }
 
     let tmp_src_tags = try!(config.source_temp_file("src_tags"));
-    try!(create_tags(config, &[&tags_files.src_dir], &&tmp_src_tags));
+    try!(create_tags(config, &[&dep_tree.source.dir], &&tmp_src_tags));
 
-    let direct_deps = dep_tree.direct_dep_sources();
+    let direct_dep_sources = dep_tree.direct_dep_sources();
 
     // create the cached tags file of 'dep_tree.source' which
     // might also contain the tags of dependencies if they're
     // reexported
-    if let Some(cached_tags_file) = tags_files.cached_tags_file {
-        let reexp_deps = try!(reexported_deps(config, &dep_tree.source, &direct_deps));
+    if let Some(ref cached_tags_file) = dep_tree.source.cached_tags_file {
+        let reexp_sources = try!(reexported_sources(config, &dep_tree.source, &direct_dep_sources));
         let mut reexp_tags_files = Vec::new();
-        for rdep in &reexp_deps {
-            let tags_files = try_and_contine_one_missing_source!(rdep.tags_files(&config.tags_spec));
-            if let Some(file) = tags_files.cached_tags_file {
-                reexp_tags_files.push(file);
+        for source in &reexp_sources {
+            if let Some(ref file) = source.cached_tags_file {
+                reexp_tags_files.push(file.as_path());
             }
         }
 
@@ -74,14 +50,13 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
     // the tags of 'source' and of its dependencies
     {
         let mut dep_tags_files = Vec::new();
-        for dep in &direct_deps {
-            let tags_files = try_and_contine_one_missing_source!(dep.tags_files(&config.tags_spec));
-            if let Some(file) = tags_files.cached_tags_file {
-                dep_tags_files.push(file);
+        for source in &direct_dep_sources {
+            if let Some(ref file) = source.cached_tags_file {
+                dep_tags_files.push(file.as_path());
             }
         }
 
-        let tmp_src_and_dep_tags = if dep_tree.source.is_root() {
+        let tmp_src_and_dep_tags = if dep_tree.source.kind == SourceKind::Root {
             try!(config.source_temp_file("root_tags"))
         } else {
             try!(config.cargo_temp_file("cargo_tags"))
@@ -93,7 +68,7 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
             try!(copy_tags(config, &tmp_src_tags, &tmp_src_and_dep_tags));
         }
 
-        try!(move_tags(config, &tmp_src_and_dep_tags, &tags_files.src_tags_file));
+        try!(move_tags(config, &tmp_src_and_dep_tags, &dep_tree.source.tags_file));
     }
 
     try!(remove_file(&tmp_src_tags));
@@ -173,28 +148,28 @@ pub fn move_tags(config: &Config, from_tags: &Path, to_tags: &Path) -> RtResult<
     Ok(())
 }
 
-fn reexported_deps(config: &Config,
-                   source: &SourceKind,
-                   deps: &[SourceKind])
-                   -> RtResult<Vec<SourceKind>> {
-    let tags_files = try!(source.tags_files(&config.tags_spec));
-    let reexp_crates = try!(find_reexported_crates(&tags_files.src_dir));
+fn reexported_sources<'a>(config: &Config,
+                          source: &Source,
+                          dep_sources: &[&'a Source])
+                          -> RtResult<Vec<&'a Source>> {
+    let reexp_crates = try!(find_reexported_crates(&source.dir));
     if reexp_crates.is_empty() {
         return Ok(Vec::new());
     }
 
     if config.verbose {
-        println!("\nFound public reexports in '{}' of:", source.get_lib_name());
-        for rcrate in reexp_crates.iter() {
+        println!("\nFound public reexports in '{}' of:", source.name);
+        for rcrate in &reexp_crates {
             println!("   {}", rcrate);
         }
+
         println!("");
     }
 
     let mut reexp_deps = Vec::new();
-    for rcrate in &reexp_crates {
-        if let Some(crate_dep) = deps.iter().find(|d| d.get_lib_name() == *rcrate) {
-            reexp_deps.push(crate_dep.clone());
+    for rcrate in reexp_crates {
+        if let Some(crate_dep) = dep_sources.iter().find(|d| d.name == *rcrate) {
+            reexp_deps.push(*crate_dep);
         }
     }
 
@@ -205,7 +180,7 @@ fn reexported_deps(config: &Config,
 /// `dependency_tag_files` into `into_tag_file`
 fn merge_tags(config: &Config,
               lib_tag_file: &Path,
-              dependency_tag_files: &[PathBuf],
+              dependency_tag_files: &[&Path],
               into_tag_file: &Path)
               -> RtResult<()> {
     if config.verbose {
@@ -277,7 +252,7 @@ fn merge_tags(config: &Config,
                 .open(into_tag_file));
 
             for file in dependency_tag_files {
-                if file.as_path() != into_tag_file {
+                if *file != into_tag_file {
                     try!(tag_file.write_fmt(format_args!("{},include\n", file.display())));
                 }
             }

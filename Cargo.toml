@@ -9,7 +9,6 @@ repository = "https://github.com/dan-t/rusty-tags"
 readme = "README.md"
 
 [dependencies]
-glob = "~0.2.11"
 toml = "~0.2.0"
 clap = "~2.10.0"
 lazy_static = "~0.2.1"
