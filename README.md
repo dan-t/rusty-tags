@@ -92,6 +92,14 @@ If you've supplied the rust source code by defining `$RUST_SRC_PATH`:
 
     setlocal tags=./rusty-tags.vi;/,$RUST_SRC_PATH/rusty-tags.vi
 
+Sublime Configuration
+=====================
+
+The sublime editor uses vi style tags, so calling `rusty-tags vi` should work.
+
+Its tags plugin seems to expect tag files with the name `.tags`, so you've to
+set `vi_tags = ".tags"` inside of `~/.rusty-tags/config.toml`.
+
 MacOS Issues
 ============
 
