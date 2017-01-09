@@ -95,10 +95,11 @@ If you've supplied the rust source code by defining `$RUST_SRC_PATH`:
 Sublime Configuration
 =====================
 
-The sublime editor uses vi style tags, so calling `rusty-tags vi` should work.
+The plugin [CTags](https://github.com/SublimeText/CTags) uses vi style tags, so
+calling `rusty-tags vi` should work.
 
-Its tags plugin seems to expect tag files with the name `.tags`, so you've to
-set `vi_tags = ".tags"` inside of `~/.rusty-tags/config.toml`.
+By default it expects tag files with the name `.tags`, which can be set
+with `vi_tags = ".tags"` inside of `~/.rusty-tags/config.toml`.
 
 MacOS Issues
 ============
