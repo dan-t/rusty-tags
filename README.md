@@ -75,10 +75,10 @@ The current supported configuration at `~/.rusty-tags/config.toml` (defaults dis
 Vim Configuration
 =================
 
-Put this into your `~/.vim/after/ftplugin/rust.vim` file:
+Put this into your `~/.vimrc` file:
 
-    setlocal tags=./rusty-tags.vi;/
-    autocmd BufWrite *.rs :silent exec "!rusty-tags vi --start-dir=" . expand('%:p:h') . "&"
+    autocmd BufRead *.rs :setlocal tags=./rusty-tags.vi;/
+    autocmd BufWrite *.rs :silent! exec "!rusty-tags vi --quiet --start-dir=" . expand('%:p:h') . "&"
 
 The first line (only supported by vim >= 7.4) ensures that vim will
 automatically search for a `rusty-tags.vi` file upwards the directory hierarchy.
@@ -90,7 +90,7 @@ The second line ensures that your projects tag file gets updated if a file is wr
 
 If you've supplied the rust source code by defining `$RUST_SRC_PATH`:
 
-    setlocal tags=./rusty-tags.vi;/,$RUST_SRC_PATH/rusty-tags.vi
+    autocmd BufRead *.rs :setlocal tags=./rusty-tags.vi;/,$RUST_SRC_PATH/rusty-tags.vi
 
 Sublime Configuration
 =====================
