@@ -1,5 +1,5 @@
 use std::fs::{File, OpenOptions, copy, rename, remove_file};
-use std::io::{Read, Write};
+use std::io::{Read, Write, ErrorKind};
 use std::process::Command;
 use std::collections::HashSet;
 use std::path::Path;
@@ -144,7 +144,15 @@ pub fn move_tags(config: &Config, from_tags: &Path, to_tags: &Path) -> RtResult<
         println!("\nMove tags ...\n   from:\n      {}\n   to:\n      {}", from_tags.display(), to_tags.display());
     }
 
-    let _ = try!(rename(from_tags, to_tags));
+    if let Err(e) = rename(from_tags, to_tags) {
+        // rename function will return error if from_tags and to_tags are on separate filesystems
+        // eg. from_tags="C:\\test.txt"  to_tags="E:\\test.txt"
+        if e.kind() == ErrorKind::Other {
+            try!(copy(from_tags, to_tags));
+            try!(remove_file(from_tags));
+        }
+    }
+
     Ok(())
 }
 
