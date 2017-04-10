@@ -107,3 +107,10 @@ MacOS Issues
 Mac OS users may encounter problems with the execution of `ctags` because the shipped version
 of this program does not support the recursive flag. See [this posting](<http://gmarik.info/blog/2010/10/08/ctags-on-OSX>)
 for how to install a working version with homebrew.
+
+Cygwin/Msys Issues
+==================
+
+If you're running [cygwin](<https://www.cygwin.com/>) or [msys](<http://www.mingw.org/wiki/MSYS>) under windows,
+then you might have to set the environment variable `$CARGO_HOME` explicitely, otherwise you might get errors
+when the tags files are moved.
