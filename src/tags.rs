@@ -1,4 +1,4 @@
-use std::fs::{File, OpenOptions, copy, rename, remove_file};
+use std::fs::{File, OpenOptions, copy, remove_file};
 use std::io::{Read, Write};
 use std::process::Command;
 use std::collections::HashSet;
@@ -144,7 +144,8 @@ pub fn move_tags(config: &Config, from_tags: &Path, to_tags: &Path) -> RtResult<
         println!("\nMove tags ...\n   from:\n      {}\n   to:\n      {}", from_tags.display(), to_tags.display());
     }
 
-    let _ = try!(rename(from_tags, to_tags));
+    try!(copy(from_tags, to_tags));
+    let _ = remove_file(from_tags);
     Ok(())
 }
 
