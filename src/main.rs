@@ -1,6 +1,6 @@
 extern crate toml;
 extern crate rustc_serialize;
-extern crate tempdir;
+extern crate tempfile;
 
 #[macro_use]
 extern crate clap;
@@ -12,7 +12,7 @@ use std::path::Path;
 use std::io::{self, Write};
 use std::process::Command;
 use std::env;
-use tempdir::TempDir;
+use tempfile::NamedTempFile;
 use rustc_serialize::json::Json;
 
 use rt_result::RtResult;
@@ -37,7 +37,6 @@ fn main() {
 fn execute() -> RtResult<()> {
     let config = try!(Config::from_command_args());
     try!(update_all_tags(&config));
-    let _ = try!(config.close_temp_dirs());
     Ok(())
 }
 
@@ -126,17 +125,13 @@ fn update_std_lib_tags(config: &Config) -> RtResult<()> {
         }
     }
 
-    let temp_dir = try!(TempDir::new_in(&src_path, "std-lib-temp-dir"));
-    let tmp_std_lib_tags = temp_dir.path().join("std_lib_tags");
-
     if ! config.quiet {
         println!("Creating tags for the standard library ...");
     }
 
-    try!(create_tags(config, &src_dirs, &tmp_std_lib_tags));
-    try!(move_tags(config, &tmp_std_lib_tags, &std_lib_tags));
-
-    try!(temp_dir.close());
+    let tmp_std_lib_tags = try!(NamedTempFile::new_in(&src_path));
+    try!(create_tags(config, &src_dirs, tmp_std_lib_tags.path()));
+    try!(move_tags(config, tmp_std_lib_tags.path(), &std_lib_tags));
 
     Ok(())
 }

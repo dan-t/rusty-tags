@@ -5,7 +5,6 @@ use std::io::Read;
 use clap::{App, Arg};
 use toml;
 use rustc_serialize::Decodable;
-use tempdir::TempDir;
 use types::{TagsKind, TagsSpec};
 use rt_result::RtResult;
 use dirs;
@@ -26,12 +25,6 @@ pub struct Config {
 
     /// don't output anything but errors
     pub quiet: bool,
-
-    cache_temp_dir: TempDir,
-
-    cargo_temp_dir: TempDir,
-
-    source_temp_dir: TempDir
 }
 
 impl Config {
@@ -75,39 +68,13 @@ impl Config {
            (vt, et)
        };
 
-       let cache_temp_dir = try!(TempDir::new_in(try!(dirs::rusty_tags_cache_dir()), "cache-temp-dir"));
-       let cargo_temp_dir = try!(TempDir::new_in(try!(dirs::cargo_dir()), "cargo-temp-dir"));
-       let src_temp_dir = try!(TempDir::new_in(&start_dir, "source-temp-dir"));
-
        Ok(Config {
            tags_spec: try!(TagsSpec::new(kind, vi_tags, emacs_tags)),
            start_dir: start_dir,
            force_recreate: matches.is_present("force-recreate"),
            verbose: if quiet { false } else { matches.is_present("verbose") },
-           quiet: quiet,
-           cache_temp_dir: cache_temp_dir,
-           cargo_temp_dir: cargo_temp_dir,
-           source_temp_dir: src_temp_dir
+           quiet: quiet
        })
-   }
-
-   pub fn cache_temp_file(&self, name: &str) -> RtResult<PathBuf> {
-       unique_file(self.cache_temp_dir.path(), name)
-   }
-
-   pub fn cargo_temp_file(&self, name: &str) -> RtResult<PathBuf> {
-       unique_file(self.cargo_temp_dir.path(), name)
-   }
-
-   pub fn source_temp_file(&self, name: &str) -> RtResult<PathBuf> {
-       unique_file(self.source_temp_dir.path(), name)
-   }
-
-   pub fn close_temp_dirs(self) -> RtResult<()> {
-       try!(self.cache_temp_dir.close());
-       try!(self.cargo_temp_dir.close());
-       try!(self.source_temp_dir.close());
-       Ok(())
    }
 }
 
@@ -153,20 +120,4 @@ pub fn map_file<R, F>(file: &Path, f: F) -> RtResult<R>
 
     let r = try!(f(contents));
     Ok(r)
-}
-
-fn unique_file(dir: &Path, name: &str) -> RtResult<PathBuf> {
-    let file = dir.join(name);
-    if ! file.is_file() {
-        return Ok(file);
-    }
-
-    for i in 0..(1 << 31) {
-        let file = dir.join(format!("{}_{}", name, i));
-        if ! file.is_file() {
-            return Ok(file);
-        }
-    }
-
-    Err(format!("Couldn't generate unique file for '{}' inside of '{}'!", name, dir.display()).into())
 }

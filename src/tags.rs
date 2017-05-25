@@ -1,12 +1,14 @@
-use std::fs::{File, OpenOptions, copy, rename, remove_file};
+use std::fs::{File, OpenOptions, copy, rename};
 use std::io::{Read, Write};
 use std::process::Command;
 use std::collections::HashSet;
 use std::path::Path;
+use tempfile::NamedTempFile;
 
 use rt_result::RtResult;
 use types::{TagsKind, Source, SourceKind, DepTree};
 use config::Config;
+use dirs::rusty_tags_cache_dir;
 
 pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
     if dep_tree.source.are_tags_files_present()
@@ -19,8 +21,11 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
         try!(update_tags(config, dep))
     }
 
-    let tmp_src_tags = try!(config.source_temp_file("src_tags"));
-    try!(create_tags(config, &[&dep_tree.source.dir], &&tmp_src_tags));
+    // create a separate temporary file for every tags file
+    // and don't share any temporary directories
+
+    let tmp_src_tags = try!(NamedTempFile::new());
+    try!(create_tags(config, &[&dep_tree.source.dir], tmp_src_tags.path()));
 
     let direct_dep_sources = dep_tree.direct_dep_sources();
 
@@ -36,14 +41,14 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
             }
         }
 
-        let tmp_cached_tags = try!(config.cache_temp_file("cached_tags"));
+        let tmp_cached_tags = try!(NamedTempFile::new_in(try!(rusty_tags_cache_dir())));
         if ! reexp_tags_files.is_empty() {
-            try!(merge_tags(config, &tmp_src_tags, &reexp_tags_files, &tmp_cached_tags));
+            try!(merge_tags(config, tmp_src_tags.path(), &reexp_tags_files, tmp_cached_tags.path()));
         } else {
-            try!(copy_tags(config, &tmp_src_tags, &tmp_cached_tags));
+            try!(copy_tags(config, tmp_src_tags.path(), tmp_cached_tags.path()));
         }
 
-        try!(move_tags(config, &tmp_cached_tags, &cached_tags_file));
+        try!(move_tags(config, tmp_cached_tags.path(), &cached_tags_file));
     }
 
     // create the source tags file of 'dep_tree.source' by merging
@@ -56,29 +61,25 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
             }
         }
 
-        let tmp_src_and_dep_tags = if dep_tree.source.kind == SourceKind::Root {
-            try!(config.source_temp_file("root_tags"))
-        } else {
-            try!(config.cargo_temp_file("cargo_tags"))
-        };
-
+        let tmp_src_and_dep_tags = try!(NamedTempFile::new_in(&dep_tree.source.dir));
         if ! dep_tags_files.is_empty() {
-            try!(merge_tags(config, &tmp_src_tags, &dep_tags_files, &tmp_src_and_dep_tags));
+            try!(merge_tags(config, tmp_src_tags.path(), &dep_tags_files, tmp_src_and_dep_tags.path()));
         } else {
-            try!(copy_tags(config, &tmp_src_tags, &tmp_src_and_dep_tags));
+            try!(copy_tags(config, tmp_src_tags.path(), tmp_src_and_dep_tags.path()));
         }
 
-        try!(move_tags(config, &tmp_src_and_dep_tags, &dep_tree.source.tags_file));
+        try!(move_tags(config, tmp_src_and_dep_tags.path(), &dep_tree.source.tags_file));
     }
-
-    try!(remove_file(&tmp_src_tags));
 
     Ok(())
 }
 
 /// creates tags recursive for the directory hierarchies starting at `src_dirs`
 /// and writes them to `tags_file`
-pub fn create_tags<P: AsRef<Path>>(config: &Config, src_dirs: &[P], tags_file: &P) -> RtResult<()> {
+pub fn create_tags<P1, P2>(config: &Config, src_dirs: &[P1], tags_file: P2) -> RtResult<()>
+    where P1: AsRef<Path>,
+          P2: AsRef<Path>
+{
     let mut cmd = Command::new("ctags");
 
     config.tags_spec.ctags_option().map(|opt| { cmd.arg(opt); () });
