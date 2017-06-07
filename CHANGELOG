@@ -1,3 +1,7 @@
+2.1.0
+-----
+* Ensure that files aren't moved between devices
+
 2.0.0
 -----
 * Complete rewrite of the dependency source path resolution
