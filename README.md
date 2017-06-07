@@ -78,7 +78,7 @@ Vim Configuration
 Put this into your `~/.vimrc` file:
 
     autocmd BufRead *.rs :setlocal tags=./rusty-tags.vi;/
-    autocmd BufWrite *.rs :silent! exec "!rusty-tags vi --quiet --start-dir=" . expand('%:p:h') . "&"
+    autocmd BufWrite *.rs :silent! exec "!rusty-tags vi --quiet --start-dir=" . expand('%:p:h') . "&" <bar> redraw!
 
 The first line (only supported by vim >= 7.4) ensures that vim will
 automatically search for a `rusty-tags.vi` file upwards the directory hierarchy.
