@@ -41,11 +41,11 @@ pub struct Source {
 
 impl Source {
     pub fn new(kind: SourceKind, name: &str, dir: &Path, tags_spec: &TagsSpec) -> RtResult<Source> {
-        let cargo_toml_dir = try!(find_dir_upwards_containing("Cargo.toml", dir));
+        let cargo_toml_dir = find_dir_upwards_containing("Cargo.toml", dir)?;
         let tags_file = cargo_toml_dir.join(tags_spec.file_name());
 
         let cached_tags_file = if kind == SourceKind::Dep {
-            let cache_dir = try!(rusty_tags_cache_dir());
+            let cache_dir = rusty_tags_cache_dir()?;
             Some(cache_dir.join(format!("{}-{}.{}", name, hash(dir), tags_spec.file_extension())))
         } else {
             None

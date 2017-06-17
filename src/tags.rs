@@ -18,14 +18,14 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
     }
 
     for dep in &dep_tree.dependencies {
-        try!(update_tags(config, dep))
+        update_tags(config, dep)?
     }
 
     // create a separate temporary file for every tags file
     // and don't share any temporary directories
 
-    let tmp_src_tags = try!(NamedTempFile::new());
-    try!(create_tags(config, &[&dep_tree.source.dir], tmp_src_tags.path()));
+    let tmp_src_tags = NamedTempFile::new()?;
+    create_tags(config, &[&dep_tree.source.dir], tmp_src_tags.path())?;
 
     let direct_dep_sources = dep_tree.direct_dep_sources();
 
@@ -33,7 +33,7 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
     // might also contain the tags of dependencies if they're
     // reexported
     if let Some(ref cached_tags_file) = dep_tree.source.cached_tags_file {
-        let reexp_sources = try!(reexported_sources(config, &dep_tree.source, &direct_dep_sources));
+        let reexp_sources = reexported_sources(config, &dep_tree.source, &direct_dep_sources)?;
         let mut reexp_tags_files = Vec::new();
         for source in &reexp_sources {
             if let Some(ref file) = source.cached_tags_file {
@@ -41,14 +41,14 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
             }
         }
 
-        let tmp_cached_tags = try!(NamedTempFile::new_in(try!(rusty_tags_cache_dir())));
+        let tmp_cached_tags = NamedTempFile::new_in(rusty_tags_cache_dir()?)?;
         if ! reexp_tags_files.is_empty() {
-            try!(merge_tags(config, tmp_src_tags.path(), &reexp_tags_files, tmp_cached_tags.path()));
+            merge_tags(config, tmp_src_tags.path(), &reexp_tags_files, tmp_cached_tags.path())?;
         } else {
-            try!(copy_tags(config, tmp_src_tags.path(), tmp_cached_tags.path()));
+            copy_tags(config, tmp_src_tags.path(), tmp_cached_tags.path())?;
         }
 
-        try!(move_tags(config, tmp_cached_tags.path(), &cached_tags_file));
+        move_tags(config, tmp_cached_tags.path(), &cached_tags_file)?;
     }
 
     // create the source tags file of 'dep_tree.source' by merging
@@ -61,14 +61,14 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
             }
         }
 
-        let tmp_src_and_dep_tags = try!(NamedTempFile::new_in(&dep_tree.source.dir));
+        let tmp_src_and_dep_tags = NamedTempFile::new_in(&dep_tree.source.dir)?;
         if ! dep_tags_files.is_empty() {
-            try!(merge_tags(config, tmp_src_tags.path(), &dep_tags_files, tmp_src_and_dep_tags.path()));
+            merge_tags(config, tmp_src_tags.path(), &dep_tags_files, tmp_src_and_dep_tags.path())?;
         } else {
-            try!(copy_tags(config, tmp_src_tags.path(), tmp_src_and_dep_tags.path()));
+            copy_tags(config, tmp_src_tags.path(), tmp_src_and_dep_tags.path())?;
         }
 
-        try!(move_tags(config, tmp_src_and_dep_tags.path(), &dep_tree.source.tags_file));
+        move_tags(config, tmp_src_and_dep_tags.path(), &dep_tree.source.tags_file)?;
     }
 
     Ok(())
@@ -112,8 +112,8 @@ pub fn create_tags<P1, P2>(config: &Config, src_dirs: &[P1], tags_file: P2) -> R
         println!("\n   cached at:\n      {}", tags_file.as_ref().display());
     }
 
-    let output = try!(cmd.output()
-        .map_err(|err| format!("'ctags' execution failed: {}\nIs 'ctags' correctly installed?", err)));
+    let output = cmd.output()
+        .map_err(|err| format!("'ctags' execution failed: {}\nIs 'ctags' correctly installed?", err))?;
 
     if ! output.status.success() {
         let mut msg = String::from_utf8_lossy(&output.stderr).into_owned();
@@ -136,7 +136,7 @@ pub fn copy_tags(config: &Config, from_tags: &Path, to_tags: &Path) -> RtResult<
         println!("\nCopy tags ...\n   from:\n      {}\n   to:\n      {}", from_tags.display(), to_tags.display());
     }
 
-    let _ = try!(copy(from_tags, to_tags));
+    let _ = copy(from_tags, to_tags)?;
     Ok(())
 }
 
@@ -145,7 +145,7 @@ pub fn move_tags(config: &Config, from_tags: &Path, to_tags: &Path) -> RtResult<
         println!("\nMove tags ...\n   from:\n      {}\n   to:\n      {}", from_tags.display(), to_tags.display());
     }
 
-    let _ = try!(rename(from_tags, to_tags));
+    let _ = rename(from_tags, to_tags)?;
     Ok(())
 }
 
@@ -153,7 +153,7 @@ fn reexported_sources<'a>(config: &Config,
                           source: &Source,
                           dep_sources: &[&'a Source])
                           -> RtResult<Vec<&'a Source>> {
-    let reexp_crates = try!(find_reexported_crates(&source.dir));
+    let reexp_crates = find_reexported_crates(&source.dir)?;
     if reexp_crates.is_empty() {
         return Ok(Vec::new());
     }
@@ -198,16 +198,16 @@ fn merge_tags(config: &Config,
             let mut file_contents: Vec<String> = Vec::new();
 
             {
-                let mut file = try!(File::open(lib_tag_file));
+                let mut file = File::open(lib_tag_file)?;
                 let mut contents = String::new();
-                try!(file.read_to_string(&mut contents));
+                file.read_to_string(&mut contents)?;
                 file_contents.push(contents);
             }
 
             for file in dependency_tag_files {
-                let mut file = try!(File::open(file));
+                let mut file = File::open(file)?;
                 let mut contents = String::new();
-                try!(file.read_to_string(&mut contents));
+                file.read_to_string(&mut contents)?;
                 file_contents.push(contents);
             }
 
@@ -225,36 +225,36 @@ fn merge_tags(config: &Config,
             merged_lines.sort();
             merged_lines.dedup();
 
-            let mut tag_file = try!(OpenOptions::new()
+            let mut tag_file = OpenOptions::new()
                 .create(true)
                 .truncate(true)
                 .read(true)
                 .write(true)
-                .open(into_tag_file));
+                .open(into_tag_file)?;
 
-            try!(tag_file.write_fmt(format_args!("{}\n", "!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;\" to lines/")));
-            try!(tag_file.write_fmt(format_args!("{}\n", "!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/")));
+            tag_file.write_fmt(format_args!("{}\n", "!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;\" to lines/"))?;
+            tag_file.write_fmt(format_args!("{}\n", "!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/"))?;
 
             for line in merged_lines.iter() {
-                try!(tag_file.write_fmt(format_args!("{}\n", *line)));
+                tag_file.write_fmt(format_args!("{}\n", *line))?;
             }
         },
 
         TagsKind::Emacs => {
             if lib_tag_file != into_tag_file {
-                try!(copy_tags(config, lib_tag_file, into_tag_file));
+                copy_tags(config, lib_tag_file, into_tag_file)?;
             }
 
-            let mut tag_file = try!(OpenOptions::new()
+            let mut tag_file = OpenOptions::new()
                 .create(true)
                 .append(true)
                 .read(true)
                 .write(true)
-                .open(into_tag_file));
+                .open(into_tag_file)?;
 
             for file in dependency_tag_files {
                 if *file != into_tag_file {
-                    try!(tag_file.write_fmt(format_args!("{},include\n", file.display())));
+                    tag_file.write_fmt(format_args!("{},include\n", file.display()))?;
                 }
             }
         }
@@ -274,9 +274,9 @@ fn find_reexported_crates(src_dir: &Path) -> RtResult<Vec<CrateName>> {
     }
 
     let contents = {
-        let mut file = try!(File::open(&lib_file));
+        let mut file = File::open(&lib_file)?;
         let mut contents = String::new();
-        try!(file.read_to_string(&mut contents));
+        file.read_to_string(&mut contents)?;
         contents
     };
 

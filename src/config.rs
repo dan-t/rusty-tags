@@ -48,7 +48,7 @@ impl Config {
 
        let start_dir = matches.value_of("start-dir")
            .map(PathBuf::from)
-           .unwrap_or(try!(env::current_dir()));
+           .unwrap_or(env::current_dir()?);
 
        if ! start_dir.is_dir() {
            return Err(format!("Invalid directory given to '--start-dir': '{}'!", start_dir.display()).into());
@@ -60,7 +60,7 @@ impl Config {
        let (vi_tags, emacs_tags) = {
            let mut vt = "rusty-tags.vi".to_string();
            let mut et = "rusty-tags.emacs".to_string();
-           if let Some(file_config) = try!(ConfigFromFile::load()) {
+           if let Some(file_config) = ConfigFromFile::load()? {
                if let Some(fcvt) = file_config.vi_tags { vt = fcvt; }
                if let Some(fcet) = file_config.emacs_tags { et = fcet; }
            }
@@ -69,7 +69,7 @@ impl Config {
        };
 
        Ok(Config {
-           tags_spec: try!(TagsSpec::new(kind, vi_tags, emacs_tags)),
+           tags_spec: TagsSpec::new(kind, vi_tags, emacs_tags)?,
            start_dir: start_dir,
            force_recreate: matches.is_present("force-recreate"),
            verbose: if quiet { false } else { matches.is_present("verbose") },
@@ -90,19 +90,19 @@ struct ConfigFromFile {
 
 impl ConfigFromFile {
     fn load() -> RtResult<Option<ConfigFromFile>> {
-        let config_file = try!(dirs::rusty_tags_dir().map(|p| p.join("config.toml")));
+        let config_file = dirs::rusty_tags_dir().map(|p| p.join("config.toml"))?;
         if ! config_file.is_file() {
             return Ok(None);
         }
 
-        let config = try!(map_file(&config_file, |contents| {
+        let config = map_file(&config_file, |contents| {
             let mut parser = toml::Parser::new(&contents);
-            let value = try!(parser.parse()
-                .ok_or_else(|| format!("Couldn't parse toml file '{}': {:?}", config_file.display(), parser.errors)));
+            let value = parser.parse()
+                .ok_or_else(|| format!("Couldn't parse toml file '{}': {:?}", config_file.display(), parser.errors))?;
 
             let mut decoder = toml::Decoder::new(toml::Value::Table(value));
-            Ok(try!(ConfigFromFile::decode(&mut decoder)))
-        }));
+            Ok(ConfigFromFile::decode(&mut decoder)?)
+        })?;
 
         Ok(Some(config))
     }
@@ -113,11 +113,11 @@ impl ConfigFromFile {
 pub fn map_file<R, F>(file: &Path, f: F) -> RtResult<R>
     where F: FnOnce(String) -> RtResult<R>
 {
-    let mut file = try!(File::open(file));
+    let mut file = File::open(file)?;
 
     let mut contents = String::new();
-    try!(file.read_to_string(&mut contents));
+    file.read_to_string(&mut contents)?;
 
-    let r = try!(f(contents));
+    let r = f(contents)?;
     Ok(r)
 }

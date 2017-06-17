@@ -35,22 +35,22 @@ fn main() {
 }
 
 fn execute() -> RtResult<()> {
-    let config = try!(Config::from_command_args());
-    try!(update_all_tags(&config));
+    let config = Config::from_command_args()?;
+    update_all_tags(&config)?;
     Ok(())
 }
 
 fn update_all_tags(config: &Config) -> RtResult<()> {
-    let metadata = try!(fetch_source_and_metadata(&config));
-    try!(update_std_lib_tags(&config));
+    let metadata = fetch_source_and_metadata(&config)?;
+    update_std_lib_tags(&config)?;
 
-    let dep_trees = try!(dependency_trees(&config, &metadata));
+    let dep_trees = dependency_trees(&config, &metadata)?;
     for tree in &dep_trees {
         if ! config.quiet {
             println!("Creating tags for '{}' ...", tree.source.name);
         }
 
-        try!(update_tags(&config, &tree));
+        update_tags(&config, &tree)?;
     }
 
     Ok(())
@@ -61,13 +61,13 @@ fn fetch_source_and_metadata(config: &Config) -> RtResult<Json> {
         println!("Fetching source and metadata ...");
     }
 
-    try!(env::set_current_dir(&config.start_dir));
+    env::set_current_dir(&config.start_dir)?;
 
     let mut cmd = Command::new("cargo");
     cmd.arg("metadata");
 
-    let output = try!(cmd.output()
-        .map_err(|err| format!("'cargo' execution failed: {}\nIs 'cargo' correctly installed?", err)));
+    let output = cmd.output()
+        .map_err(|err| format!("'cargo' execution failed: {}\nIs 'cargo' correctly installed?", err))?;
 
     if ! output.status.success() {
         let mut msg = String::from_utf8_lossy(&output.stderr).into_owned();
@@ -78,7 +78,7 @@ fn fetch_source_and_metadata(config: &Config) -> RtResult<Json> {
         return Err(msg.into());
     }
 
-    Ok(try!(Json::from_str(&String::from_utf8_lossy(&output.stdout))))
+    Ok(Json::from_str(&String::from_utf8_lossy(&output.stdout))?)
 }
 
 fn update_std_lib_tags(config: &Config) -> RtResult<()> {
@@ -129,9 +129,9 @@ fn update_std_lib_tags(config: &Config) -> RtResult<()> {
         println!("Creating tags for the standard library ...");
     }
 
-    let tmp_std_lib_tags = try!(NamedTempFile::new_in(&src_path));
-    try!(create_tags(config, &src_dirs, tmp_std_lib_tags.path()));
-    try!(move_tags(config, tmp_std_lib_tags.path(), &std_lib_tags));
+    let tmp_std_lib_tags = NamedTempFile::new_in(&src_path)?;
+    create_tags(config, &src_dirs, tmp_std_lib_tags.path())?;
+    move_tags(config, tmp_std_lib_tags.path(), &std_lib_tags)?;
 
     Ok(())
 }

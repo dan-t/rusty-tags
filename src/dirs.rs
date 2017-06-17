@@ -39,32 +39,18 @@ fn home_dir_internal() -> RtResult<PathBuf> {
 }
 
 fn rusty_tags_cache_dir_internal() -> RtResult<PathBuf> {
-    let dir = try!(
-        rusty_tags_dir()
-            .map(Path::to_path_buf)
-            .map(|mut d| {
-                d.push("cache");
-                d
-            })
-    );
-
+    let dir = rusty_tags_dir()?.join("cache");
     if ! dir.is_dir() {
-        try!(fs::create_dir_all(&dir));
+        fs::create_dir_all(&dir)?;
     }
 
     Ok(dir)
 }
 
 fn rusty_tags_dir_internal() -> RtResult<PathBuf> {
-    let dir = try!(
-        home_dir().map(|mut d| {
-            d.push(".rusty-tags");
-            d
-        })
-    );
-
+    let dir = home_dir()?.join(".rusty-tags");
     if ! dir.is_dir() {
-        try!(fs::create_dir_all(&dir));
+        fs::create_dir_all(&dir)?;
     }
 
     Ok(dir)
