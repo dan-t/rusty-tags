@@ -174,7 +174,7 @@ fn src_path(package: &Json, source_kind: SourceKind) -> RtResult<Option<&Path>> 
 
             match source_kind {
                 SourceKind::Root => {
-                    if kind_str != "bin" && kind_str != "lib" {
+                    if kind_str != "bin" && kind_str != "lib" && kind_str != "proc-macro" {
                         continue;
                     }
                 },
