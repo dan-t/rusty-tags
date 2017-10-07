@@ -74,11 +74,13 @@ fn build_dep_tree<'a>(config: &Config,
     let mut dep_tree = None;
     if let Some(pkg) = find_package(src_name, packages) {
         if let Some(src_path) = src_path(pkg, kind)? {
-            let dep_names = dependency_names(pkg)?;
             let mut dep_trees = Vec::new();
-            for name in &dep_names {
-                if let Some(tree) = build_dep_tree(config, name, SourceKind::Dep, packages, dep_graph)? {
-                    dep_trees.push(Box::new(tree));
+            if !config.omit_deps {
+                let dep_names = dependency_names(pkg)?;
+                for name in &dep_names {
+                    if let Some(tree) = build_dep_tree(config, name, SourceKind::Dep, packages, dep_graph)? {
+                        dep_trees.push(Box::new(tree));
+                    }
                 }
             }
 

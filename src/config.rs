@@ -17,6 +17,9 @@ pub struct Config {
     /// start directory for the search of the 'Cargo.toml'
     pub start_dir: PathBuf,
 
+    /// do not generate tags for dependencies
+    pub omit_deps: bool,
+
     /// forces the recreation of cached tags
     pub force_recreate: bool,
 
@@ -41,6 +44,7 @@ impl Config {
                 .value_names(&["DIR"])
                 .help("Start directory for the search of the Cargo.toml (default: current working directory)")
                 .takes_value(true))
+           .arg_from_usage("-o --omit-deps 'Do not generate tags for dependencies'")
            .arg_from_usage("-f --force-recreate 'Forces the recreation of all tags'")
            .arg_from_usage("-v --verbose 'Verbose output about all operations'")
            .arg_from_usage("-q --quiet 'Don't output anything but errors'")
@@ -53,6 +57,8 @@ impl Config {
        if ! start_dir.is_dir() {
            return Err(format!("Invalid directory given to '--start-dir': '{}'!", start_dir.display()).into());
        }
+
+       let omit_deps = matches.is_present("omit-deps");
 
        let quiet = matches.is_present("quiet");
        let kind = value_t_or_exit!(matches.value_of("TAGS_KIND"), TagsKind);
@@ -71,6 +77,7 @@ impl Config {
        Ok(Config {
            tags_spec: TagsSpec::new(kind, vi_tags, emacs_tags)?,
            start_dir: start_dir,
+           omit_deps: omit_deps,
            force_recreate: matches.is_present("force-recreate"),
            verbose: if quiet { false } else { matches.is_present("verbose") },
            quiet: quiet
