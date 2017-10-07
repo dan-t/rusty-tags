@@ -111,6 +111,6 @@ for how to install a working version with homebrew.
 Cygwin/Msys Issues
 ==================
 
-If you're running [cygwin](<https://www.cygwin.com/>) or [msys](<http://www.mingw.org/wiki/MSYS>) under windows,
-then you might have to set the environment variable `$CARGO_HOME` explicitely, otherwise you might get errors
+If you're running [Cygwin](<https://www.cygwin.com/>) or [Msys](<http://www.mingw.org/wiki/MSYS>) under Windows,
+you might have to set the environment variable `$CARGO_HOME` explicitly. Otherwise you might get errors
 when the tags files are moved.
