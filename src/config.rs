@@ -45,7 +45,7 @@ impl Config {
                 .help("Start directory for the search of the Cargo.toml (default: current working directory)")
                 .takes_value(true))
            .arg_from_usage("-o --omit-deps 'Do not generate tags for dependencies'")
-           .arg_from_usage("-f --force-recreate 'Forces the recreation of all tags'")
+           .arg_from_usage("-f --force-recreate 'Forces the recreation of the tags of all dependencies and the Rust standard library'")
            .arg_from_usage("-v --verbose 'Verbose output about all operations'")
            .arg_from_usage("-q --quiet 'Don't output anything but errors'")
            .get_matches();
