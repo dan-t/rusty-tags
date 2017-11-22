@@ -2,9 +2,11 @@ use std::env;
 use std::path::{Path, PathBuf};
 use std::fs::File;
 use std::io::Read;
-use clap::{App, Arg};
+use std::cmp::max;
+use clap::App;
 use toml;
 use rustc_serialize::Decodable;
+use num_cpus;
 use types::{TagsKind, TagsSpec};
 use rt_result::RtResult;
 use dirs;
@@ -28,6 +30,9 @@ pub struct Config {
 
     /// don't output anything but errors
     pub quiet: bool,
+
+    /// num threads used for the tags creation
+    pub num_threads: u32
 }
 
 impl Config {
@@ -38,16 +43,12 @@ impl Config {
            .version(crate_version!())
            .author("Daniel Trstenjak <daniel.trstenjak@gmail.com>")
            .arg_from_usage("<TAGS_KIND> 'The kind of the created tags (vi, emacs)'")
-           .arg(Arg::with_name("start-dir")
-                .short("s")
-                .long("start-dir")
-                .value_names(&["DIR"])
-                .help("Start directory for the search of the Cargo.toml (default: current working directory)")
-                .takes_value(true))
+           .arg_from_usage("-s --start-dir [DIR] 'Start directory for the search of the Cargo.toml (default: current working directory)'")
            .arg_from_usage("-o --omit-deps 'Do not generate tags for dependencies'")
            .arg_from_usage("-f --force-recreate 'Forces the recreation of the tags of all dependencies and the Rust standard library'")
            .arg_from_usage("-v --verbose 'Verbose output about all operations'")
            .arg_from_usage("-q --quiet 'Don't output anything but errors'")
+           .arg_from_usage("-n --num-threads [NUM] 'Num threads used for the tags creation (default: num available physical cpus)'")
            .get_matches();
 
        let start_dir = matches.value_of("start-dir")
@@ -58,10 +59,6 @@ impl Config {
            return Err(format!("Invalid directory given to '--start-dir': '{}'!", start_dir.display()).into());
        }
 
-       let omit_deps = matches.is_present("omit-deps");
-
-       let quiet = matches.is_present("quiet");
-       let kind = value_t_or_exit!(matches.value_of("TAGS_KIND"), TagsKind);
 
        let (vi_tags, emacs_tags) = {
            let mut vt = "rusty-tags.vi".to_string();
@@ -74,13 +71,24 @@ impl Config {
            (vt, et)
        };
 
+       let kind = value_t_or_exit!(matches.value_of("TAGS_KIND"), TagsKind);
+       let omit_deps = matches.is_present("omit-deps");
+       let force_recreate = matches.is_present("force-recreate");
+       let quiet = matches.is_present("quiet");
+       let verbose = if quiet { false } else { matches.is_present("verbose") };
+
+       let num_threads = value_t!(matches.value_of("num-threads"), u32)
+           .map(|n| max(1, n))
+           .unwrap_or(num_cpus::get_physical() as u32);
+
        Ok(Config {
            tags_spec: TagsSpec::new(kind, vi_tags, emacs_tags)?,
            start_dir: start_dir,
            omit_deps: omit_deps,
-           force_recreate: matches.is_present("force-recreate"),
-           verbose: if quiet { false } else { matches.is_present("verbose") },
-           quiet: quiet
+           force_recreate: force_recreate,
+           verbose: verbose,
+           quiet: quiet,
+           num_threads: num_threads,
        })
    }
 }

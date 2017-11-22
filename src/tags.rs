@@ -4,7 +4,6 @@ use std::process::Command;
 use std::collections::HashSet;
 use std::path::Path;
 use tempfile::NamedTempFile;
-use num_cpus;
 use scoped_threadpool::Pool;
 
 use rt_result::RtResult;
@@ -23,7 +22,7 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
         update_tags_internal(config, deps_by_depth[0][0])?;
     }
     else {
-        let mut thread_pool = Pool::new(num_cpus::get() as u32);
+        let mut thread_pool = Pool::new(config.num_threads);
         for deps in &deps_by_depth {
             thread_pool.scoped(|scoped| {
                 for dep in deps {
