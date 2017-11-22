@@ -19,6 +19,36 @@ impl DepTree {
             .map(|d| &d.source)
             .collect()
     }
+
+    pub fn deps_by_depth(&self, which: WhichDep) -> Vec<Vec<&DepTree>> {
+        let mut deps = Vec::with_capacity(50);
+        self.deps_by_depth_internal(0, which, &mut deps);
+        deps.into_iter().rev().collect()
+    }
+
+    fn deps_by_depth_internal<'a>(&'a self, depth: usize, which: WhichDep, deps: &mut Vec<Vec<&'a DepTree>>) {
+        if which == WhichDep::WithMissingTags
+            && self.source.kind != SourceKind::Root // the root should be always rebuild
+            && self.source.are_tags_files_present() {
+            return;
+        }
+
+        if deps.len() <= depth {
+            deps.push(Vec::with_capacity(50));
+        }
+
+        deps[depth].push(&self);
+
+        for dep in &self.dependencies {
+            dep.deps_by_depth_internal(depth + 1, which, deps);
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WhichDep {
+    All,
+    WithMissingTags
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

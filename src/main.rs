@@ -1,6 +1,8 @@
 extern crate toml;
 extern crate rustc_serialize;
 extern crate tempfile;
+extern crate num_cpus;
+extern crate scoped_threadpool;
 
 #[macro_use]
 extern crate clap;

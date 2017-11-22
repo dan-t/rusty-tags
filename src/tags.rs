@@ -4,74 +4,92 @@ use std::process::Command;
 use std::collections::HashSet;
 use std::path::Path;
 use tempfile::NamedTempFile;
+use num_cpus;
+use scoped_threadpool::Pool;
 
 use rt_result::RtResult;
-use types::{TagsKind, Source, SourceKind, DepTree};
+use types::{TagsKind, Source, DepTree, WhichDep};
 use config::Config;
 use dirs::rusty_tags_cache_dir;
 
 pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
-    if dep_tree.source.are_tags_files_present()
-        && dep_tree.source.kind != SourceKind::Root
-        && ! config.force_recreate {
+    let which_deps = if config.force_recreate { WhichDep::All } else { WhichDep::WithMissingTags };
+    let deps_by_depth = dep_tree.deps_by_depth(which_deps);
+    if deps_by_depth.is_empty() {
         return Ok(());
     }
 
-    for dep in &dep_tree.dependencies {
-        update_tags(config, dep)?
+    if deps_by_depth.len() == 1 && deps_by_depth[0].len() == 1 {
+        update_tags_internal(config, deps_by_depth[0][0])?;
+    }
+    else {
+        let mut thread_pool = Pool::new(num_cpus::get() as u32);
+        for deps in &deps_by_depth {
+            thread_pool.scoped(|scoped| {
+                for dep in deps {
+                    scoped.execute(move || {
+                        update_tags_internal(config, dep).unwrap();
+                    });
+                }
+            });
+        }
     }
 
-    // create a separate temporary file for every tags file
-    // and don't share any temporary directories
+    return Ok(());
 
-    let tmp_src_tags = NamedTempFile::new()?;
-    create_tags(config, &[&dep_tree.source.dir], tmp_src_tags.path())?;
+    fn update_tags_internal(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
+        // create a separate temporary file for every tags file
+        // and don't share any temporary directories
 
-    let direct_dep_sources = dep_tree.direct_dep_sources();
+        let tmp_src_tags = NamedTempFile::new()?;
+        create_tags(config, &[&dep_tree.source.dir], tmp_src_tags.path())?;
 
-    // create the cached tags file of 'dep_tree.source' which
-    // might also contain the tags of dependencies if they're
-    // reexported
-    if let Some(ref cached_tags_file) = dep_tree.source.cached_tags_file {
-        let reexp_sources = reexported_sources(config, &dep_tree.source, &direct_dep_sources)?;
-        let mut reexp_tags_files = Vec::new();
-        for source in &reexp_sources {
-            if let Some(ref file) = source.cached_tags_file {
-                reexp_tags_files.push(file.as_path());
+        let direct_dep_sources = dep_tree.direct_dep_sources();
+
+        // create the cached tags file of 'dep_tree.source' which
+        // might also contain the tags of dependencies if they're
+        // reexported
+        if let Some(ref cached_tags_file) = dep_tree.source.cached_tags_file {
+            let reexp_sources = reexported_sources(config, &dep_tree.source, &direct_dep_sources)?;
+            let mut reexp_tags_files = Vec::new();
+            for source in &reexp_sources {
+                if let Some(ref file) = source.cached_tags_file {
+                    reexp_tags_files.push(file.as_path());
+                }
             }
-        }
 
-        let tmp_cached_tags = NamedTempFile::new_in(rusty_tags_cache_dir()?)?;
-        if ! reexp_tags_files.is_empty() {
-            merge_tags(config, tmp_src_tags.path(), &reexp_tags_files, tmp_cached_tags.path())?;
-        } else {
-            copy_tags(config, tmp_src_tags.path(), tmp_cached_tags.path())?;
-        }
-
-        move_tags(config, tmp_cached_tags.path(), &cached_tags_file)?;
-    }
-
-    // create the source tags file of 'dep_tree.source' by merging
-    // the tags of 'source' and of its dependencies
-    {
-        let mut dep_tags_files = Vec::new();
-        for source in &direct_dep_sources {
-            if let Some(ref file) = source.cached_tags_file {
-                dep_tags_files.push(file.as_path());
+            let tmp_cached_tags = NamedTempFile::new_in(rusty_tags_cache_dir()?)?;
+            if ! reexp_tags_files.is_empty() {
+                merge_tags(config, tmp_src_tags.path(), &reexp_tags_files, tmp_cached_tags.path())?;
+            } else {
+                copy_tags(config, tmp_src_tags.path(), tmp_cached_tags.path())?;
             }
+
+            move_tags(config, tmp_cached_tags.path(), &cached_tags_file)?;
         }
 
-        let tmp_src_and_dep_tags = NamedTempFile::new_in(&dep_tree.source.dir)?;
-        if ! dep_tags_files.is_empty() {
-            merge_tags(config, tmp_src_tags.path(), &dep_tags_files, tmp_src_and_dep_tags.path())?;
-        } else {
-            copy_tags(config, tmp_src_tags.path(), tmp_src_and_dep_tags.path())?;
+        // create the source tags file of 'dep_tree.source' by merging
+        // the tags of 'source' and of its dependencies
+        {
+            let mut dep_tags_files = Vec::new();
+            for source in &direct_dep_sources {
+                if let Some(ref file) = source.cached_tags_file {
+                    dep_tags_files.push(file.as_path());
+                }
+            }
+
+            let tmp_src_and_dep_tags = NamedTempFile::new_in(&dep_tree.source.dir)?;
+            if ! dep_tags_files.is_empty() {
+                merge_tags(config, tmp_src_tags.path(), &dep_tags_files, tmp_src_and_dep_tags.path())?;
+            } else {
+                copy_tags(config, tmp_src_tags.path(), tmp_src_and_dep_tags.path())?;
+            }
+
+            move_tags(config, tmp_src_and_dep_tags.path(), &dep_tree.source.tags_file)?;
         }
 
-        move_tags(config, tmp_src_and_dep_tags.path(), &dep_tree.source.tags_file)?;
+        Ok(())
     }
-
-    Ok(())
 }
 
 /// creates tags recursive for the directory hierarchies starting at `src_dirs`

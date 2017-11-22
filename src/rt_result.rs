@@ -8,7 +8,7 @@ use toml;
 pub type RtResult<T> = Result<T, RtErr>;
 
 /// The generic error used in the whole application.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum RtErr {
     /// generic error message
     Message(String),
