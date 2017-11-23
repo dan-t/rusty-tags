@@ -37,7 +37,7 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
     return Ok(());
 
     fn update_tags_internal(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
-        if ! dep_tree.source.needs_tags_update() {
+        if ! config.force_recreate && ! dep_tree.source.needs_tags_update() {
             return Ok(());
         }
 
