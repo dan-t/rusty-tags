@@ -27,9 +27,7 @@ impl DepTree {
     }
 
     fn deps_by_depth_internal<'a>(&'a self, depth: usize, which: WhichDep, deps: &mut Vec<Vec<&'a DepTree>>) {
-        if which == WhichDep::WithMissingTags
-            && self.source.kind != SourceKind::Root // the root should be always rebuild
-            && self.source.are_tags_files_present() {
+        if which == WhichDep::WithMissingTags && ! self.source.needs_tags_update() {
             return;
         }
 
@@ -90,14 +88,19 @@ impl Source {
         })
     }
 
-    pub fn are_tags_files_present(&self) -> bool {
+    pub fn needs_tags_update(&self) -> bool {
+        // tags of the root (the cargo project) should be always rebuild
+        if self.kind == SourceKind::Root {
+            return true;
+        }
+
         if let Some(ref file) = self.cached_tags_file {
             if ! file.is_file() {
-                return false;
+                return true;
             }
         }
 
-        self.tags_file.is_file()
+        ! self.tags_file.is_file()
     }
 }
 

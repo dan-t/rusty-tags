@@ -37,6 +37,10 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
     return Ok(());
 
     fn update_tags_internal(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
+        if ! dep_tree.source.needs_tags_update() {
+            return Ok(());
+        }
+
         // create a separate temporary file for every tags file
         // and don't share any temporary directories
 
