@@ -27,7 +27,7 @@ impl DepTree {
     }
 
     fn deps_by_depth_internal<'a>(&'a self, depth: usize, which: WhichDep, deps: &mut Vec<Vec<&'a DepTree>>) {
-        if which == WhichDep::WithMissingTags && ! self.source.needs_tags_update() {
+        if which == WhichDep::NeedsTagsUpdate && ! self.source.needs_tags_update() {
             return;
         }
 
@@ -46,7 +46,7 @@ impl DepTree {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WhichDep {
     All,
-    WithMissingTags
+    NeedsTagsUpdate
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

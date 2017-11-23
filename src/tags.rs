@@ -12,7 +12,7 @@ use config::Config;
 use dirs::rusty_tags_cache_dir;
 
 pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
-    let which_deps = if config.force_recreate { WhichDep::All } else { WhichDep::WithMissingTags };
+    let which_deps = if config.force_recreate { WhichDep::All } else { WhichDep::NeedsTagsUpdate };
     let deps_by_depth = dep_tree.deps_by_depth(which_deps);
     if deps_by_depth.is_empty() {
         return Ok(());
