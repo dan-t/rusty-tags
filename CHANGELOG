@@ -1,3 +1,8 @@
+2.4.0
+-----
+* Multi threaded creation of tags (--num-threads)
+* Add a lock file during the tags creation of a cargo project
+
 2.3.0
 -----
 * Add option to omit building tags for dependencies (--omit-deps)
