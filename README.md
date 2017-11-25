@@ -4,9 +4,9 @@
 rusty-tags
 ==========
 
-A command line tool that creates tags - for source code navigation by
-using [ctags](<http://ctags.sourceforge.net>) - for a [cargo](<https://github.com/rust-lang/cargo>) project and all
-of its dependencies.
+A command line tool that creates [tags](https://en.wikipedia.org/wiki/Ctags) - for source code navigation by
+using [ctags](<http://ctags.sourceforge.net>) - for a [cargo](<https://github.com/rust-lang/cargo>) project, all
+of its direct and indirect dependencies and the rust standard library.
 
 Prerequisites
 =============
