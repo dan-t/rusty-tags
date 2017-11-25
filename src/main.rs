@@ -10,10 +10,14 @@ extern crate clap;
 #[macro_use]
 extern crate lazy_static;
 
+#[macro_use(defer)]
+extern crate scopeguard;
+
 use std::path::Path;
 use std::io::{self, Write};
 use std::process::Command;
 use std::env;
+use std::fs::{File, remove_file};
 use tempfile::NamedTempFile;
 use rustc_serialize::json::Json;
 
@@ -21,6 +25,7 @@ use rt_result::RtResult;
 use dependencies::dependency_trees;
 use tags::{update_tags, create_tags, move_tags};
 use config::Config;
+use dirs::rusty_tags_locks_dir;
 
 mod rt_result;
 mod dependencies;
@@ -48,6 +53,23 @@ fn update_all_tags(config: &Config) -> RtResult<()> {
 
     let dep_trees = dependency_trees(&config, &metadata)?;
     for tree in &dep_trees {
+        let lock_file = rusty_tags_locks_dir()?.join(tree.source.hash());
+        if lock_file.is_file() {
+            if ! config.quiet {
+                println!("Already creating tags for '{}', if this isn't the case remove the lock file '{}'",
+                         tree.source.name, lock_file.display());
+            }
+
+            continue;
+        }
+
+        File::create(&lock_file)?;
+        defer! {
+            if lock_file.is_file() {
+                let _ = remove_file(&lock_file);
+            }
+        };
+
         if ! config.quiet {
             println!("Creating tags for '{}' ...", tree.source.name);
         }

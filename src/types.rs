@@ -102,6 +102,10 @@ impl Source {
 
         ! self.tags_file.is_file()
     }
+
+    pub fn hash(&self) -> String {
+        format!("{}-{}", self.name, hash(&self.dir))
+    }
 }
 
 /// which kind of tags are created
