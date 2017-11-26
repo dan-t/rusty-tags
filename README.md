@@ -16,7 +16,7 @@ Prerequisites
 On a linux system the package is most likely called `exuberant-ctags`.
 
 Otherwise you can get the sources directly from [here](http://ctags.sourceforge.net/) or use the newer and alternative
-[universal-ctags](https://github.com/universal-ctags/ctags);
+[universal-ctags](https://github.com/universal-ctags/ctags).
 
 Installation
 ============
