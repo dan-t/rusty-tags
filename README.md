@@ -12,7 +12,11 @@ Prerequisites
 =============
 
 * [ctags](<http://ctags.sourceforge.net>) installed, needs a version with the `--recurse` flag
-* [git](<http://git-scm.com/>) installed if git dependencies are used
+
+On a linux system the package is most likely called `exuberant-ctags`.
+
+Otherwise you can get the sources directly from [here](http://ctags.sourceforge.net/) or use the newer and alternative
+[https://github.com/universal-ctags/ctags](universal-ctags).
 
 Installation
 ============
