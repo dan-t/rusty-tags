@@ -64,19 +64,16 @@ pub struct Source {
     pub name: String,
     pub dir: PathBuf,
     pub tags_file: PathBuf,
-    pub cached_tags_file: Option<PathBuf>
+    pub cached_tags_file: PathBuf,
 }
 
 impl Source {
     pub fn new(kind: SourceKind, name: &str, dir: &Path, tags_spec: &TagsSpec) -> RtResult<Source> {
         let cargo_toml_dir = find_dir_upwards_containing("Cargo.toml", dir)?;
         let tags_file = cargo_toml_dir.join(tags_spec.file_name());
-
-        let cached_tags_file = if kind == SourceKind::Dep {
+        let cached_tags_file = {
             let cache_dir = rusty_tags_cache_dir()?;
-            Some(cache_dir.join(format!("{}-{}.{}", name, hash(dir), tags_spec.file_extension())))
-        } else {
-            None
+            cache_dir.join(format!("{}-{}.{}", name, hash(dir), tags_spec.file_extension()))
         };
 
         Ok(Source {
@@ -94,13 +91,7 @@ impl Source {
             return true;
         }
 
-        if let Some(ref file) = self.cached_tags_file {
-            if ! file.is_file() {
-                return true;
-            }
-        }
-
-        ! self.tags_file.is_file()
+        ! self.cached_tags_file.is_file() || ! self.tags_file.is_file()
     }
 
     pub fn hash(&self) -> String {

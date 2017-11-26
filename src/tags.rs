@@ -52,13 +52,12 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
         // create the cached tags file of 'dep_tree.source' which
         // might also contain the tags of dependencies if they're
         // reexported
-        if let Some(ref cached_tags_file) = dep_tree.source.cached_tags_file {
+        {
+            let cached_tags_file = &dep_tree.source.cached_tags_file;
             let reexp_sources = reexported_sources(config, &dep_tree.source, &direct_dep_sources)?;
             let mut reexp_tags_files = Vec::new();
             for source in &reexp_sources {
-                if let Some(ref file) = source.cached_tags_file {
-                    reexp_tags_files.push(file.as_path());
-                }
+                reexp_tags_files.push(source.cached_tags_file.as_path());
             }
 
             let tmp_cached_tags = NamedTempFile::new_in(rusty_tags_cache_dir()?)?;
@@ -76,9 +75,7 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
         {
             let mut dep_tags_files = Vec::new();
             for source in &direct_dep_sources {
-                if let Some(ref file) = source.cached_tags_file {
-                    dep_tags_files.push(file.as_path());
-                }
+                dep_tags_files.push(source.cached_tags_file.as_path());
             }
 
             let tmp_src_and_dep_tags = NamedTempFile::new_in(&dep_tree.source.dir)?;
