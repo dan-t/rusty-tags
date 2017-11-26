@@ -1,3 +1,8 @@
+2.5.0
+-----
+* Ensure that the cached tags of local dependencies - which are developed in conjunction
+  with the cargo project - get updated on source changes. 
+
 2.4.0
 -----
 * Multi threaded creation of tags (--num-threads)
