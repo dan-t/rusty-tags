@@ -1,3 +1,16 @@
+2.6.0
+-----
+* Detect universal ctags and call it with just "--languages=Rust" and without any regexes,
+  because it already supports Rust and the regexes only slow down the tags creation.
+
+  Universal ctags supports the creation of tags for struct fields and enum variants out
+  of the box, which isn't possible with the regex based approach.
+
+* Add configuration option 'ctags_options' in '~/.rusty-tags/config.toml'. The 'ctags_options'
+  are given as options to the ctags executable.
+
+  E.g. I'm using universal ctags but don't like tags for impls, so I've set 'ctags_options = "--Rust-kinds=-c"'.
+
 2.5.1
 -----
 * Only README updates
