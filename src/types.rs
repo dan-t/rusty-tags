@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
+use std::process::Command;
 
 use rt_result::RtResult;
 use dirs::rusty_tags_cache_dir;
@@ -108,28 +109,43 @@ arg_enum! {
     }
 }
 
+type ExeName = String;
+
+/// which ctags executable is used
+pub enum TagsExe {
+    ExuberantCtags(ExeName),
+    UniversalCtags(ExeName)
+}
+
 /// holds additional info for the kind of tags, which extension
 /// they use for caching and which user viewable file names they get
 pub struct TagsSpec {
     pub kind: TagsKind,
 
+    exe: TagsExe,
+
     /// the file name for vi tags
     vi_tags: String,
 
     /// the file name for emacs tags
-    emacs_tags: String
+    emacs_tags: String,
+
+    /// options given to the ctags executable
+    ctags_options: String
 }
 
 impl TagsSpec {
-    pub fn new(kind: TagsKind, vi_tags: String, emacs_tags: String) -> RtResult<TagsSpec> {
+    pub fn new(kind: TagsKind, exe: TagsExe, vi_tags: String, emacs_tags: String, ctags_options: String) -> RtResult<TagsSpec> {
         if vi_tags == emacs_tags {
             return Err(format!("It's not supported to use the same tags name '{}' for vi and emacs!", vi_tags).into());
         }
 
         Ok(TagsSpec {
             kind: kind,
+            exe: exe,
             vi_tags: vi_tags,
-            emacs_tags: emacs_tags
+            emacs_tags: emacs_tags,
+            ctags_options: ctags_options
         })
     }
 
@@ -147,10 +163,45 @@ impl TagsSpec {
         }
     }
 
-    pub fn ctags_option(&self) -> Option<&'static str> {
+    pub fn ctags_command(&self) -> Command {
+        match self.exe {
+            TagsExe::ExuberantCtags(ref exe_name) => {
+                let mut cmd = Command::new(&exe_name);
+                self.generic_ctags_options(&mut cmd);
+                cmd.arg("--languages=Rust")
+                   .arg("--langdef=Rust")
+                   .arg("--langmap=Rust:.rs")
+                   .arg("--regex-Rust=/^[ \\t]*(#\\[[^\\]]\\][ \\t]*)*(pub[ \\t]+)?(extern[ \\t]+)?(\"[^\"]+\"[ \\t]+)?(unsafe[ \\t]+)?fn[ \\t]+([a-zA-Z0-9_]+)/\\6/f,functions,function definitions/")
+                   .arg("--regex-Rust=/^[ \\t]*(pub[ \\t]+)?type[ \\t]+([a-zA-Z0-9_]+)/\\2/T,types,type definitions/")
+                   .arg("--regex-Rust=/^[ \\t]*(pub[ \\t]+)?enum[ \\t]+([a-zA-Z0-9_]+)/\\2/g,enum,enumeration names/")
+                   .arg("--regex-Rust=/^[ \\t]*(pub[ \\t]+)?struct[ \\t]+([a-zA-Z0-9_]+)/\\2/s,structure names/")
+                   .arg("--regex-Rust=/^[ \\t]*(pub[ \\t]+)?mod[ \\t]+([a-zA-Z0-9_]+)\\s*\\{/\\2/m,modules,module names/")
+                   .arg("--regex-Rust=/^[ \\t]*(pub[ \\t]+)?(static|const)[ \\t]+([a-zA-Z0-9_]+)/\\3/c,consts,static constants/")
+                   .arg("--regex-Rust=/^[ \\t]*(pub[ \\t]+)?trait[ \\t]+([a-zA-Z0-9_]+)/\\2/t,traits,traits/")
+                   .arg("--regex-Rust=/^[ \\t]*macro_rules![ \\t]+([a-zA-Z0-9_]+)/\\1/d,macros,macro definitions/");
+
+                cmd
+            }
+
+            TagsExe::UniversalCtags(ref exe_name) => {
+                let mut cmd = Command::new(&exe_name);
+                self.generic_ctags_options(&mut cmd);
+                cmd.arg("--languages=Rust");
+
+                cmd
+            }
+        }
+    }
+
+    fn generic_ctags_options(&self, cmd: &mut Command) {
         match self.kind {
-            TagsKind::Vi    => None,
-            TagsKind::Emacs => Some("-e")
+            TagsKind::Vi    => {}
+            TagsKind::Emacs => { cmd.arg("-e"); }
+        }
+
+        cmd.arg("--recurse");
+        if ! self.ctags_options.is_empty() {
+            cmd.arg(&self.ctags_options);
         }
     }
 }

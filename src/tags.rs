@@ -1,6 +1,5 @@
 use std::fs::{File, OpenOptions, copy, rename};
 use std::io::{Read, Write};
-use std::process::Command;
 use std::collections::HashSet;
 use std::path::Path;
 use tempfile::NamedTempFile;
@@ -98,24 +97,9 @@ pub fn create_tags<P1, P2>(config: &Config, src_dirs: &[P1], tags_file: P2) -> R
     where P1: AsRef<Path>,
           P2: AsRef<Path>
 {
-    let mut cmd = Command::new("ctags");
-
-    config.tags_spec.ctags_option().map(|opt| { cmd.arg(opt); () });
-
-    cmd.arg("--recurse")
-        .arg("--languages=Rust")
-        .arg("--langdef=Rust")
-        .arg("--langmap=Rust:.rs")
-        .arg("--regex-Rust=/^[ \\t]*(#\\[[^\\]]\\][ \\t]*)*(pub[ \\t]+)?(extern[ \\t]+)?(\"[^\"]+\"[ \\t]+)?(unsafe[ \\t]+)?fn[ \\t]+([a-zA-Z0-9_]+)/\\6/f,functions,function definitions/")
-        .arg("--regex-Rust=/^[ \\t]*(pub[ \\t]+)?type[ \\t]+([a-zA-Z0-9_]+)/\\2/T,types,type definitions/")
-        .arg("--regex-Rust=/^[ \\t]*(pub[ \\t]+)?enum[ \\t]+([a-zA-Z0-9_]+)/\\2/g,enum,enumeration names/")
-        .arg("--regex-Rust=/^[ \\t]*(pub[ \\t]+)?struct[ \\t]+([a-zA-Z0-9_]+)/\\2/s,structure names/")
-        .arg("--regex-Rust=/^[ \\t]*(pub[ \\t]+)?mod[ \\t]+([a-zA-Z0-9_]+)\\s*\\{/\\2/m,modules,module names/")
-        .arg("--regex-Rust=/^[ \\t]*(pub[ \\t]+)?(static|const)[ \\t]+([a-zA-Z0-9_]+)/\\3/c,consts,static constants/")
-        .arg("--regex-Rust=/^[ \\t]*(pub[ \\t]+)?trait[ \\t]+([a-zA-Z0-9_]+)/\\2/t,traits,traits/")
-        .arg("--regex-Rust=/^[ \\t]*macro_rules![ \\t]+([a-zA-Z0-9_]+)/\\1/d,macros,macro definitions/")
-        .arg("-o")
-        .arg(tags_file.as_ref());
+    let mut cmd = config.tags_spec.ctags_command();
+    cmd.arg("-o")
+       .arg(tags_file.as_ref());
 
     for dir in src_dirs {
         cmd.arg(dir.as_ref());

@@ -3,11 +3,12 @@ use std::path::{Path, PathBuf};
 use std::fs::File;
 use std::io::Read;
 use std::cmp::max;
+use std::process::Command;
 use clap::App;
 use toml;
 use rustc_serialize::Decodable;
 use num_cpus;
-use types::{TagsKind, TagsSpec};
+use types::{TagsExe, TagsKind, TagsSpec};
 use rt_result::RtResult;
 use dirs;
 
@@ -60,15 +61,17 @@ impl Config {
        }
 
 
-       let (vi_tags, emacs_tags) = {
+       let (vi_tags, emacs_tags, ctags_options) = {
            let mut vt = "rusty-tags.vi".to_string();
            let mut et = "rusty-tags.emacs".to_string();
+           let mut cto = "".to_string();
            if let Some(file_config) = ConfigFromFile::load()? {
                if let Some(fcvt) = file_config.vi_tags { vt = fcvt; }
                if let Some(fcet) = file_config.emacs_tags { et = fcet; }
+               if let Some(fccto) = file_config.ctags_options { cto = fccto; }
            }
 
-           (vt, et)
+           (vt, et, cto)
        };
 
        let kind = value_t_or_exit!(matches.value_of("TAGS_KIND"), TagsKind);
@@ -81,8 +84,12 @@ impl Config {
            .map(|n| max(1, n))
            .unwrap_or(num_cpus::get_physical() as u32);
 
+       if verbose {
+           println!("Using configuration: vi_tags='{}', emacs_tags='{}', ctags_options='{}'", vi_tags, emacs_tags, ctags_options);
+       }
+
        Ok(Config {
-           tags_spec: TagsSpec::new(kind, vi_tags, emacs_tags)?,
+           tags_spec: TagsSpec::new(kind, detect_tags_exe(verbose)?, vi_tags, emacs_tags, ctags_options)?,
            start_dir: start_dir,
            omit_deps: omit_deps,
            force_recreate: force_recreate,
@@ -101,6 +108,9 @@ struct ConfigFromFile {
 
     /// the file name used for emacs tags
     emacs_tags: Option<String>,
+
+    /// options given to the ctags executable
+    ctags_options: Option<String>
 }
 
 impl ConfigFromFile {
@@ -125,7 +135,7 @@ impl ConfigFromFile {
 
 /// Reads `file` into a string which is passed to the function `f`
 /// and its return value is returned by `map_file`.
-pub fn map_file<R, F>(file: &Path, f: F) -> RtResult<R>
+fn map_file<R, F>(file: &Path, f: F) -> RtResult<R>
     where F: FnOnce(String) -> RtResult<R>
 {
     let mut file = File::open(file)?;
@@ -135,4 +145,32 @@ pub fn map_file<R, F>(file: &Path, f: F) -> RtResult<R>
 
     let r = f(contents)?;
     Ok(r)
+}
+
+fn detect_tags_exe(verbose: bool) -> RtResult<TagsExe> {
+    for exe in &["ctags", "exuberant-ctags", "universal-ctags"] {
+        let mut cmd = Command::new(exe);
+        cmd.arg("--version");
+
+        if let Ok(output) = cmd.output() {
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                if stdout.contains("Universal Ctags") {
+                    if verbose {
+                        println!("Found Universal Ctags with executable '{}'", exe);
+                    }
+
+                    return Ok(TagsExe::UniversalCtags(exe.to_string()));
+                }
+
+                if verbose {
+                    println!("Found Excuberant Ctags with executable '{}'", exe);
+                }
+
+                return Ok(TagsExe::ExuberantCtags(exe.to_string()));
+            }
+        }
+    }
+
+    Err("Couldn't find 'ctags' executable! Is 'ctags' correctly installed?".into())
 }

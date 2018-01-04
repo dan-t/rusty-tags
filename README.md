@@ -18,6 +18,8 @@ On a linux system the package is most likely called `exuberant-ctags`.
 Otherwise you can get the sources directly from [here](http://ctags.sourceforge.net/) or use the newer and alternative
 [universal-ctags](https://github.com/universal-ctags/ctags).
 
+Only `universal-ctags` will add tags for struct fields and enum variants.
+
 Installation
 ============
 
@@ -75,6 +77,9 @@ The current supported configuration at `~/.rusty-tags/config.toml` (defaults dis
 
     # the file name used for emacs tags
     emacs_tags = "rusty-tags.emacs"
+
+    # options given to the ctags executable
+    ctags_options = ""
 
 Vim Configuration
 =================
