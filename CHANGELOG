@@ -1,3 +1,7 @@
+2.7.0
+-----
+* Upgrading dependencies
+
 2.6.0
 -----
 * Detect universal ctags and call it with just "--languages=Rust" and without any regexes,
