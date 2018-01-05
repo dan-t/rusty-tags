@@ -11,7 +11,7 @@ readme = "README.md"
 [dependencies]
 toml = "0.4.5"
 clap = "~2.10.0"
-lazy_static = "~0.2.1"
+lazy_static = "1.0.0"
 tempfile = "~2.1.5"
 scoped_threadpool = "0.1.8"
 num_cpus = "1.8.0"
