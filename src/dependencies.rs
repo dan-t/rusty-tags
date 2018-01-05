@@ -1,13 +1,13 @@
 use std::path::Path;
 use std::collections::HashSet;
-use rustc_serialize::json::{self, as_pretty_json, Json};
+use serde_json;
 
 use rt_result::RtResult;
 use types::{DepTree, Source, SourceKind};
 use config::Config;
 
 /// Returns the dependency tree of the cargo project.
-pub fn dependency_trees(config: &Config, metadata: &Json) -> RtResult<Vec<DepTree>> {
+pub fn dependency_trees(config: &Config, metadata: &serde_json::Value) -> RtResult<Vec<DepTree>> {
     let packages = packages(&metadata)?;
     let root_names = root_names(&metadata)?;
 
@@ -58,7 +58,7 @@ impl<'a> DepGraph<'a> {
 fn build_dep_tree<'a>(config: &Config,
                       src_name: &'a str,
                       kind: SourceKind,
-                      packages: &'a json::Array,
+                      packages: &'a Vec<serde_json::Value>,
                       dep_graph: &mut DepGraph<'a>)
                       -> RtResult<Option<DepTree>> {
     if dep_graph.contains(src_name) {
@@ -95,15 +95,15 @@ fn build_dep_tree<'a>(config: &Config,
     Ok(dep_tree)
 }
 
-fn root_names(metadata: &Json) -> RtResult<Vec<&str>> {
-    let members = metadata.find("workspace_members")
-        .and_then(Json::as_array)
-        .ok_or(format!("Couldn't find array entry 'workspace_members' in metadata:\n{}", as_pretty_json(metadata)))?;
+fn root_names(metadata: &serde_json::Value) -> RtResult<Vec<&str>> {
+    let members = metadata.get("workspace_members")
+        .and_then(serde_json::Value::as_array)
+        .ok_or(format!("Couldn't find array entry 'workspace_members' in metadata:\n{}", to_string_pretty(metadata)))?;
 
     let mut names = Vec::new();
     for member in members {
-        let member_str = member.as_string()
-            .ok_or(format!("Expected 'workspace_members' of type string but found: {}", as_pretty_json(member)))?;
+        let member_str = member.as_str()
+            .ok_or(format!("Expected 'workspace_members' of type string but found: {}", to_string_pretty(member)))?;
 
         let name = member_str.split(' ')
             .nth(0)
@@ -115,15 +115,15 @@ fn root_names(metadata: &Json) -> RtResult<Vec<&str>> {
     Ok(names)
 }
 
-fn packages(metadata: &Json) -> RtResult<&json::Array> {
-    metadata.find("packages")
-        .and_then(Json::as_array)
-        .ok_or(format!("Couldn't find array entry 'packages' in metadata:\n{}", as_pretty_json(metadata)).into())
+fn packages(metadata: &serde_json::Value) -> RtResult<&Vec<serde_json::Value>> {
+    metadata.get("packages")
+        .and_then(serde_json::Value::as_array)
+        .ok_or(format!("Couldn't find array entry 'packages' in metadata:\n{}", to_string_pretty(metadata)).into())
 }
 
-fn find_package<'a>(name: &str, packages: &'a json::Array) -> Option<&'a Json> {
+fn find_package<'a>(name: &str, packages: &'a Vec<serde_json::Value>) -> Option<&'a serde_json::Value> {
     for package in packages {
-        if Some(name) == package.find("name").and_then(Json::as_string) {
+        if Some(name) == package.get("name").and_then(serde_json::Value::as_str) {
             return Some(package);
         }
     }
@@ -131,16 +131,16 @@ fn find_package<'a>(name: &str, packages: &'a json::Array) -> Option<&'a Json> {
     None
 }
 
-fn dependency_names(package: &Json) -> RtResult<Vec<&str>> {
-    let deps = package.find("dependencies")
-        .and_then(Json::as_array)
-        .ok_or(format!("Couldn't find array entry 'dependencies' in package:\n{}", as_pretty_json(package)))?;
+fn dependency_names(package: &serde_json::Value) -> RtResult<Vec<&str>> {
+    let deps = package.get("dependencies")
+        .and_then(serde_json::Value::as_array)
+        .ok_or(format!("Couldn't find array entry 'dependencies' in package:\n{}", to_string_pretty(package)))?;
 
     let mut names = Vec::new();
     for dep in deps {
-        let name = dep.find("name")
-            .and_then(Json::as_string)
-            .ok_or(format!("Couldn't find string entry 'name' in dependency:\n{}", as_pretty_json(dep)))?;
+        let name = dep.get("name")
+            .and_then(serde_json::Value::as_str)
+            .ok_or(format!("Couldn't find string entry 'name' in dependency:\n{}", to_string_pretty(dep)))?;
 
         names.push(name);
     }
@@ -150,29 +150,29 @@ fn dependency_names(package: &Json) -> RtResult<Vec<&str>> {
     Ok(names)
 }
 
-fn src_path(package: &Json, source_kind: SourceKind) -> RtResult<Option<&Path>> {
-    let targets = package.find("targets")
-        .and_then(Json::as_array)
-        .ok_or(format!("Couldn't find array entry 'targets' in package:\n{}", as_pretty_json(package)))?;
+fn src_path(package: &serde_json::Value, source_kind: SourceKind) -> RtResult<Option<&Path>> {
+    let targets = package.get("targets")
+        .and_then(serde_json::Value::as_array)
+        .ok_or(format!("Couldn't find array entry 'targets' in package:\n{}", to_string_pretty(package)))?;
 
     let manifest_dir = {
-        let manifest_path = package.find("manifest_path")
-            .and_then(Json::as_string)
+        let manifest_path = package.get("manifest_path")
+            .and_then(serde_json::Value::as_str)
             .map(Path::new)
-            .ok_or(format!("Couldn't find string entry 'manifest_path' in package:\n{}", as_pretty_json(package)))?;
+            .ok_or(format!("Couldn't find string entry 'manifest_path' in package:\n{}", to_string_pretty(package)))?;
 
         manifest_path.parent()
             .ok_or(format!("Couldn't get directory of path '{:?}'", manifest_path.display()))?
     };
 
     for target in targets {
-        let kinds = target.find("kind")
-            .and_then(Json::as_array)
-            .ok_or(format!("Couldn't find array entry 'kind' in target:\n{}", as_pretty_json(target)))?;
+        let kinds = target.get("kind")
+            .and_then(serde_json::Value::as_array)
+            .ok_or(format!("Couldn't find array entry 'kind' in target:\n{}", to_string_pretty(target)))?;
 
         for kind in kinds {
-            let kind_str = kind.as_string()
-                .ok_or(format!("Expected 'kind' of type string but found: {}", as_pretty_json(kind)))?;
+            let kind_str = kind.as_str()
+                .ok_or(format!("Expected 'kind' of type string but found: {}", to_string_pretty(kind)))?;
 
             match source_kind {
                 SourceKind::Root => {
@@ -188,15 +188,15 @@ fn src_path(package: &Json, source_kind: SourceKind) -> RtResult<Option<&Path>> 
                 }
             }
 
-            let mut src_path = target.find("src_path")
-                .and_then(Json::as_string)
+            let mut src_path = target.get("src_path")
+                .and_then(serde_json::Value::as_str)
                 .map(Path::new)
-                .ok_or(format!("Couldn't find string entry 'src_path' in target:\n{}", as_pretty_json(target)))?;
+                .ok_or(format!("Couldn't find string entry 'src_path' in target:\n{}", to_string_pretty(target)))?;
 
             if src_path.is_absolute() && src_path.is_file() {
                 src_path = src_path.parent()
                     .ok_or(format!("Couldn't get directory of path '{:?}' in target:\n{}\nof package:\n{}",
-                                   src_path.display(), as_pretty_json(target), as_pretty_json(package)))?;
+                                   src_path.display(), to_string_pretty(target), to_string_pretty(package)))?;
             }
 
             if src_path.is_relative() {
@@ -205,7 +205,7 @@ fn src_path(package: &Json, source_kind: SourceKind) -> RtResult<Option<&Path>> 
 
             if ! src_path.is_dir() {
                 return Err(format!("Invalid source path directory '{:?}' in target:\n{}\nof package:\n{}",
-                                   src_path.display(), as_pretty_json(target), as_pretty_json(package)).into());
+                                   src_path.display(), to_string_pretty(target), to_string_pretty(package)).into());
             }
 
             return Ok(Some(src_path));
@@ -213,4 +213,8 @@ fn src_path(package: &Json, source_kind: SourceKind) -> RtResult<Option<&Path>> 
     }
 
     Ok(None)
+}
+
+fn to_string_pretty(value: &serde_json::Value) -> String {
+    serde_json::to_string_pretty(value).unwrap_or(String::new())
 }

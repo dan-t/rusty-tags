@@ -1,8 +1,12 @@
 extern crate toml;
-extern crate rustc_serialize;
 extern crate tempfile;
 extern crate num_cpus;
 extern crate scoped_threadpool;
+extern crate serde;
+extern crate serde_json;
+
+#[macro_use]
+extern crate serde_derive;
 
 #[macro_use]
 extern crate clap;
@@ -19,7 +23,6 @@ use std::process::Command;
 use std::env;
 use std::fs::{File, remove_file};
 use tempfile::NamedTempFile;
-use rustc_serialize::json::Json;
 
 use rt_result::RtResult;
 use dependencies::dependency_trees;
@@ -80,7 +83,7 @@ fn update_all_tags(config: &Config) -> RtResult<()> {
     Ok(())
 }
 
-fn fetch_source_and_metadata(config: &Config) -> RtResult<Json> {
+fn fetch_source_and_metadata(config: &Config) -> RtResult<serde_json::Value> {
     if ! config.quiet {
         println!("Fetching source and metadata ...");
     }
@@ -102,7 +105,7 @@ fn fetch_source_and_metadata(config: &Config) -> RtResult<Json> {
         return Err(msg.into());
     }
 
-    Ok(Json::from_str(&String::from_utf8_lossy(&output.stdout))?)
+    Ok(serde_json::from_str(&String::from_utf8_lossy(&output.stdout))?)
 }
 
 fn update_std_lib_tags(config: &Config) -> RtResult<()> {

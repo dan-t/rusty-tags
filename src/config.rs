@@ -6,7 +6,6 @@ use std::cmp::max;
 use std::process::Command;
 use clap::App;
 use toml;
-use rustc_serialize::Decodable;
 use num_cpus;
 use types::{TagsExe, TagsKind, TagsSpec};
 use rt_result::RtResult;
@@ -101,7 +100,7 @@ impl Config {
 }
 
 /// Represents the data from a `.rusty-tags/config.toml` configuration file.
-#[derive(RustcDecodable, Debug, Default)]
+#[derive(Deserialize, Debug, Default)]
 struct ConfigFromFile {
     /// the file name used for vi tags
     vi_tags: Option<String>,
@@ -121,12 +120,8 @@ impl ConfigFromFile {
         }
 
         let config = map_file(&config_file, |contents| {
-            let mut parser = toml::Parser::new(&contents);
-            let value = parser.parse()
-                .ok_or_else(|| format!("Couldn't parse toml file '{}': {:?}", config_file.display(), parser.errors))?;
-
-            let mut decoder = toml::Decoder::new(toml::Value::Table(value));
-            Ok(ConfigFromFile::decode(&mut decoder)?)
+            let config = toml::from_str(&contents)?;
+            Ok(config)
         })?;
 
         Ok(Some(config))

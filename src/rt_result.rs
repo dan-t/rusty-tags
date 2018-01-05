@@ -1,8 +1,8 @@
 use std::io;
 use std::convert::From;
 use std::fmt::{self, Display, Formatter};
-use rustc_serialize::json;
 use toml;
+use serde_json;
 
 /// The result used in the whole application.
 pub type RtResult<T> = Result<T, RtErr>;
@@ -28,14 +28,14 @@ impl From<io::Error> for RtErr {
     }
 }
 
-impl From<toml::DecodeError> for RtErr {
-    fn from(err: toml::DecodeError) -> RtErr {
-        RtErr::Message(format!("{}", err))
+impl From<toml::de::Error> for RtErr {
+    fn from(err: toml::de::Error) -> RtErr {
+        RtErr::Message(err.to_string())
     }
 }
 
-impl From<json::ParserError> for RtErr {
-    fn from(err: json::ParserError) -> RtErr {
+impl From<serde_json::Error> for RtErr {
+    fn from(err: serde_json::Error) -> RtErr {
         RtErr::Message(format!("{}", err))
     }
 }
