@@ -92,6 +92,7 @@ fn fetch_source_and_metadata(config: &Config) -> RtResult<serde_json::Value> {
 
     let mut cmd = Command::new("cargo");
     cmd.arg("metadata");
+    cmd.arg("--format-version=1");
 
     let output = cmd.output()
         .map_err(|err| format!("'cargo' execution failed: {}\nIs 'cargo' correctly installed?", err))?;
