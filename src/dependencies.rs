@@ -10,6 +10,7 @@ use config::Config;
 pub fn dependency_trees(config: &Config, metadata: &serde_json::Value) -> RtResult<Vec<DepTree>> {
     let packages = packages(&metadata)?;
     let root_names = root_names(&metadata)?;
+    verbose!(config, "Found workspace members: '{:?}'", root_names);
 
     let mut dep_trees = Vec::new();
     for name in &root_names {
@@ -70,10 +71,12 @@ fn build_dep_tree<'a>(config: &Config,
 
     let mut dep_tree = None;
     if let Some(pkg) = find_package(src_name, packages) {
-        if let Some(src_path) = src_path(pkg, kind)? {
+        verbose!(config, "Found package of '{}'", src_name);
+        if let Some(src_path) = src_path(config, pkg, kind)? {
             let mut dep_trees = Vec::new();
             if !config.omit_deps {
                 let dep_names = dependency_names(pkg)?;
+                verbose!(config, "Found dependencies of '{}': '{:?}'", src_name, dep_names);
                 for name in &dep_names {
                     if let Some(tree) = build_dep_tree(config, name, SourceKind::Dep, packages, dep_graph)? {
                         dep_trees.push(Box::new(tree));
@@ -86,7 +89,9 @@ fn build_dep_tree<'a>(config: &Config,
                 dependencies: dep_trees
             });
         }
-    };
+    } else {
+        verbose!(config, "Couldn't find package of '{}'", src_name);
+    }
 
     dep_graph.pop();
     Ok(dep_tree)
@@ -147,7 +152,7 @@ fn dependency_names(package: &serde_json::Value) -> RtResult<Vec<&str>> {
     Ok(names)
 }
 
-fn src_path(package: &serde_json::Value, source_kind: SourceKind) -> RtResult<Option<&Path>> {
+fn src_path<'a>(config: &Config, package: &'a serde_json::Value, source_kind: SourceKind) -> RtResult<Option<&'a Path>> {
     let targets = package.get("targets")
         .and_then(serde_json::Value::as_array)
         .ok_or(format!("Couldn't find array entry 'targets' in package:\n{}", to_string_pretty(package)))?;
@@ -174,12 +179,14 @@ fn src_path(package: &serde_json::Value, source_kind: SourceKind) -> RtResult<Op
             match source_kind {
                 SourceKind::Root => {
                     if kind_str != "bin" && kind_str != "lib" && kind_str != "proc-macro" {
+                        verbose!(config, "Unsupported target kind for root: {}", kind_str);
                         continue;
                     }
                 },
 
                 SourceKind::Dep => {
                     if kind_str != "lib" {
+                        verbose!(config, "Unsupported target kind for dependency: {}", kind_str);
                         continue;
                     }
                 }
