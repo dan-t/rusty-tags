@@ -1,3 +1,7 @@
+2.8.0
+-----
+* Support target kind 'staticlib' as tags root
+
 2.7.0
 -----
 * Upgrading dependencies
