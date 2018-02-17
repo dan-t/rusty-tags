@@ -84,7 +84,8 @@ impl Config {
            .unwrap_or(num_cpus::get_physical() as u32);
 
        if verbose {
-           println!("Using configuration: vi_tags='{}', emacs_tags='{}', ctags_options='{}'", vi_tags, emacs_tags, ctags_options);
+           verbose_!("Using configuration: vi_tags='{}', emacs_tags='{}', ctags_options='{}'",
+                     vi_tags, emacs_tags, ctags_options);
        }
 
        Ok(Config {
@@ -152,14 +153,14 @@ fn detect_tags_exe(verbose: bool) -> RtResult<TagsExe> {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 if stdout.contains("Universal Ctags") {
                     if verbose {
-                        println!("Found Universal Ctags with executable '{}'", exe);
+                        verbose_!("Found Universal Ctags with executable '{}'", exe);
                     }
 
                     return Ok(TagsExe::UniversalCtags(exe.to_string()));
                 }
 
                 if verbose {
-                    println!("Found Excuberant Ctags with executable '{}'", exe);
+                    verbose_!("Found Excuberant Ctags with executable '{}'", exe);
                 }
 
                 return Ok(TagsExe::ExuberantCtags(exe.to_string()));

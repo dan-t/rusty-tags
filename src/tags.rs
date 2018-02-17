@@ -106,12 +106,12 @@ pub fn create_tags<P1, P2>(config: &Config, src_dirs: &[P1], tags_file: P2) -> R
     }
 
     if config.verbose {
-        println!("\nCreating tags ...\n   for source:");
+        verbose_!("\nCreating tags ...\n   for source:");
         for dir in src_dirs {
-            println!("      {}", dir.as_ref().display());
+            verbose_!("      {}", dir.as_ref().display());
         }
 
-        println!("\n   cached at:\n      {}", tags_file.as_ref().display());
+        verbose_!("\n   cached at:\n      {}", tags_file.as_ref().display());
     }
 
     let output = cmd.output()
@@ -134,18 +134,16 @@ pub fn create_tags<P1, P2>(config: &Config, src_dirs: &[P1], tags_file: P2) -> R
 }
 
 pub fn copy_tags(config: &Config, from_tags: &Path, to_tags: &Path) -> RtResult<()> {
-    if config.verbose {
-        println!("\nCopy tags ...\n   from:\n      {}\n   to:\n      {}", from_tags.display(), to_tags.display());
-    }
+    verbose!(config, "\nCopy tags ...\n   from:\n      {}\n   to:\n      {}",
+             from_tags.display(), to_tags.display());
 
     let _ = copy(from_tags, to_tags)?;
     Ok(())
 }
 
 pub fn move_tags(config: &Config, from_tags: &Path, to_tags: &Path) -> RtResult<()> {
-    if config.verbose {
-        println!("\nMove tags ...\n   from:\n      {}\n   to:\n      {}", from_tags.display(), to_tags.display());
-    }
+    verbose!(config, "\nMove tags ...\n   from:\n      {}\n   to:\n      {}",
+             from_tags.display(), to_tags.display());
 
     let _ = rename(from_tags, to_tags)?;
     Ok(())
@@ -161,12 +159,12 @@ fn reexported_sources<'a>(config: &Config,
     }
 
     if config.verbose {
-        println!("\nFound public reexports in '{}' of:", source.name);
+        verbose_!("\nFound public reexports in '{}' of:", source.name);
         for rcrate in &reexp_crates {
-            println!("   {}", rcrate);
+            verbose_!("   {}", rcrate);
         }
 
-        println!("");
+        verbose_!("");
     }
 
     let mut reexp_deps = Vec::new();
@@ -187,12 +185,12 @@ fn merge_tags(config: &Config,
               into_tag_file: &Path)
               -> RtResult<()> {
     if config.verbose {
-        println!("\nMerging ...\n   tags:");
-        println!("      {}", lib_tag_file.display());
+        verbose_!("\nMerging ...\n   tags:");
+        verbose_!("      {}", lib_tag_file.display());
         for file in dependency_tag_files {
-            println!("      {}", file.display());
+            verbose_!("      {}", file.display());
         }
-        println!("\n   into:\n      {}", into_tag_file.display());
+        verbose_!("\n   into:\n      {}", into_tag_file.display());
     }
 
     match config.tags_spec.kind {

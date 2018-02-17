@@ -30,6 +30,9 @@ use tags::{update_tags, create_tags, move_tags};
 use config::Config;
 use dirs::rusty_tags_locks_dir;
 
+#[macro_use]
+mod output;
+
 mod rt_result;
 mod dependencies;
 mod dirs;
@@ -58,11 +61,8 @@ fn update_all_tags(config: &Config) -> RtResult<()> {
     for tree in &dep_trees {
         let lock_file = rusty_tags_locks_dir()?.join(tree.source.hash());
         if lock_file.is_file() {
-            if ! config.quiet {
-                println!("Already creating tags for '{}', if this isn't the case remove the lock file '{}'",
-                         tree.source.name, lock_file.display());
-            }
-
+            info!(config, "Already creating tags for '{}', if this isn't the case remove the lock file '{}'",
+                  tree.source.name, lock_file.display());
             continue;
         }
 
@@ -73,10 +73,7 @@ fn update_all_tags(config: &Config) -> RtResult<()> {
             }
         };
 
-        if ! config.quiet {
-            println!("Creating tags for '{}' ...", tree.source.name);
-        }
-
+        info!(config, "Creating tags for '{}' ...", tree.source.name);
         update_tags(&config, &tree)?;
     }
 
@@ -84,9 +81,7 @@ fn update_all_tags(config: &Config) -> RtResult<()> {
 }
 
 fn fetch_source_and_metadata(config: &Config) -> RtResult<serde_json::Value> {
-    if ! config.quiet {
-        println!("Fetching source and metadata ...");
-    }
+    info!(config, "Fetching source and metadata ...");
 
     env::set_current_dir(&config.start_dir)?;
 
@@ -153,9 +148,7 @@ fn update_std_lib_tags(config: &Config) -> RtResult<()> {
         }
     }
 
-    if ! config.quiet {
-        println!("Creating tags for the standard library ...");
-    }
+    info!(config, "Creating tags for the standard library ...");
 
     let tmp_std_lib_tags = NamedTempFile::new_in(&src_path)?;
     create_tags(config, &src_dirs, tmp_std_lib_tags.path())?;

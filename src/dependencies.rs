@@ -62,10 +62,7 @@ fn build_dep_tree<'a>(config: &Config,
                       dep_graph: &mut DepGraph<'a>)
                       -> RtResult<Option<DepTree>> {
     if dep_graph.contains(src_name) {
-        if config.verbose {
-            println!("\nFound cyclic dependency on source '{}' in dependency graph:\n{:?}", src_name, dep_graph.get());
-        }
-
+        verbose!(config, "\nFound cyclic dependency on source '{}' in dependency graph:\n{:?}", src_name, dep_graph.get());
         return Ok(None);
     }
 
