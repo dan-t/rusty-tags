@@ -1,3 +1,7 @@
+2.9.0
+-----
+* Create tags for any kind of lib: lib, dylib, staticlib, cdylib or rlib
+
 2.8.0
 -----
 * Support target kind 'staticlib' as tags root
