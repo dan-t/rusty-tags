@@ -176,14 +176,14 @@ fn src_path<'a>(config: &Config, package: &'a serde_json::Value, source_kind: So
 
             match source_kind {
                 SourceKind::Root => {
-                    if kind_str != "bin" && kind_str != "lib" && kind_str != "proc-macro" && kind_str != "staticlib" {
+                    if kind_str != "bin" && ! kind_str.contains("lib") && kind_str != "proc-macro" {
                         verbose!(config, "Unsupported target kind for root: {}", kind_str);
                         continue;
                     }
                 },
 
                 SourceKind::Dep => {
-                    if kind_str != "lib" {
+                    if ! kind_str.contains("lib") {
                         verbose!(config, "Unsupported target kind for dependency: {}", kind_str);
                         continue;
                     }
