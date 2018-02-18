@@ -63,7 +63,7 @@ fn build_dep_tree<'a>(config: &Config,
                       dep_graph: &mut DepGraph<'a>)
                       -> RtResult<Option<DepTree>> {
     if dep_graph.contains(src_name) {
-        verbose!(config, "\nFound cyclic dependency on source '{}' in dependency graph:\n{:?}", src_name, dep_graph.get());
+        verbose!(config, "\nFound cyclic dependency on source '{}' in dependency graph:\n{:?}\n", src_name, dep_graph.get());
         return Ok(None);
     }
 
@@ -89,8 +89,6 @@ fn build_dep_tree<'a>(config: &Config,
                 dependencies: dep_trees
             });
         }
-    } else {
-        verbose!(config, "Couldn't find package of '{}'", src_name);
     }
 
     dep_graph.pop();
