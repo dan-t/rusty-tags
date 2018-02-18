@@ -83,13 +83,15 @@ impl Config {
            .map(|n| max(1, n))
            .unwrap_or(num_cpus::get_physical() as u32);
 
+       let ctags_exe = detect_tags_exe()?;
        if verbose {
-           verbose_!("Using configuration: vi_tags='{}', emacs_tags='{}', ctags_options='{}'",
-                     vi_tags, emacs_tags, ctags_options);
+           println!("Using configuration: vi_tags='{}', emacs_tags='{}', ctags_options='{}'",
+                    vi_tags, emacs_tags, ctags_options);
+           println!("Found {:?}", ctags_exe);
        }
 
        Ok(Config {
-           tags_spec: TagsSpec::new(kind, detect_tags_exe(verbose)?, vi_tags, emacs_tags, ctags_options)?,
+           tags_spec: TagsSpec::new(kind, ctags_exe, vi_tags, emacs_tags, ctags_options)?,
            start_dir: start_dir,
            omit_deps: omit_deps,
            force_recreate: force_recreate,
@@ -143,7 +145,7 @@ fn map_file<R, F>(file: &Path, f: F) -> RtResult<R>
     Ok(r)
 }
 
-fn detect_tags_exe(verbose: bool) -> RtResult<TagsExe> {
+fn detect_tags_exe() -> RtResult<TagsExe> {
     for exe in &["ctags", "exuberant-ctags", "universal-ctags"] {
         let mut cmd = Command::new(exe);
         cmd.arg("--version");
@@ -152,15 +154,7 @@ fn detect_tags_exe(verbose: bool) -> RtResult<TagsExe> {
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 if stdout.contains("Universal Ctags") {
-                    if verbose {
-                        verbose_!("Found Universal Ctags with executable '{}'", exe);
-                    }
-
                     return Ok(TagsExe::UniversalCtags(exe.to_string()));
-                }
-
-                if verbose {
-                    verbose_!("Found Excuberant Ctags with executable '{}'", exe);
                 }
 
                 return Ok(TagsExe::ExuberantCtags(exe.to_string()));

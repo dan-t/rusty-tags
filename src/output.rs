@@ -28,12 +28,10 @@ macro_rules! verbose {
     }};
 }
 
-macro_rules! verbose_ {
-    ($fmt:expr) => {{
-        println!($fmt);
-    }};
-
-    ($fmt:expr, $($arg:tt)*) => {{
-        println!($fmt, $($arg)*);
+macro_rules! with_verbose {
+    ($config:ident, $func:expr) => {{
+        if $config.verbose {
+            $func();
+        }
     }};
 }

@@ -105,14 +105,14 @@ pub fn create_tags<P1, P2>(config: &Config, src_dirs: &[P1], tags_file: P2) -> R
         cmd.arg(dir.as_ref());
     }
 
-    if config.verbose {
-        verbose_!("\nCreating tags ...\n   for source:");
+    with_verbose!(config, || {
+        println!("\nCreating tags ...\n   for source:");
         for dir in src_dirs {
-            verbose_!("      {}", dir.as_ref().display());
+            println!("      {}", dir.as_ref().display());
         }
 
-        verbose_!("\n   cached at:\n      {}", tags_file.as_ref().display());
-    }
+        println!("\n   cached at:\n      {}", tags_file.as_ref().display());
+    });
 
     let output = cmd.output()
         .map_err(|err| format!("'ctags' execution failed: {}\nIs 'ctags' correctly installed?", err))?;
@@ -158,14 +158,14 @@ fn reexported_sources<'a>(config: &Config,
         return Ok(Vec::new());
     }
 
-    if config.verbose {
-        verbose_!("\nFound public reexports in '{}' of:", source.name);
+    with_verbose!(config, || {
+        println!("\nFound public reexports in '{}' of:", source.name);
         for rcrate in &reexp_crates {
-            verbose_!("   {}", rcrate);
+            println!("   {}", rcrate);
         }
 
-        verbose_!("");
-    }
+        println!("");
+    });
 
     let mut reexp_deps = Vec::new();
     for rcrate in reexp_crates {
@@ -184,14 +184,14 @@ fn merge_tags(config: &Config,
               dependency_tag_files: &[&Path],
               into_tag_file: &Path)
               -> RtResult<()> {
-    if config.verbose {
-        verbose_!("\nMerging ...\n   tags:");
-        verbose_!("      {}", lib_tag_file.display());
+    with_verbose!(config, || {
+        println!("\nMerging ...\n   tags:");
+        println!("      {}", lib_tag_file.display());
         for file in dependency_tag_files {
-            verbose_!("      {}", file.display());
+            println!("      {}", file.display());
         }
-        verbose_!("\n   into:\n      {}", into_tag_file.display());
-    }
+        println!("\n   into:\n      {}", into_tag_file.display());
+    });
 
     match config.tags_spec.kind {
         TagsKind::Vi => {

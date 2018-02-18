@@ -112,6 +112,7 @@ arg_enum! {
 type ExeName = String;
 
 /// which ctags executable is used
+#[derive(Debug)]
 pub enum TagsExe {
     ExuberantCtags(ExeName),
     UniversalCtags(ExeName)
