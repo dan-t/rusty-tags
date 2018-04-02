@@ -146,7 +146,7 @@ fn map_file<R, F>(file: &Path, f: F) -> RtResult<R>
 }
 
 fn detect_tags_exe() -> RtResult<TagsExe> {
-    for exe in &["ctags", "exuberant-ctags", "universal-ctags"] {
+    for exe in &["universal-ctags", "uctags", "exuberant-ctags", "exctags", "ctags"] {
         let mut cmd = Command::new(exe);
         cmd.arg("--version");
 
