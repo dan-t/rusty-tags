@@ -154,7 +154,7 @@ fn detect_tags_exe(ctags_exe: &Option<String>) -> RtResult<TagsExe> {
     let exes = if let &Some(ref exe) = ctags_exe {
         vec![exe.as_str()]
     } else {
-        vec!["ctags", "exuberant-ctags", "universal-ctags"]
+        vec!["ctags", "exuberant-ctags", "exctags", "universal-ctags", "uctags"]
     };
 
     for exe in &exes {
