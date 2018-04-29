@@ -85,11 +85,14 @@ impl Config {
            .map(|n| max(1, n))
            .unwrap_or(num_cpus::get_physical() as u32);
 
+       if verbose {
+           println!("Using configuration: vi_tags='{}', emacs_tags='{}', ctags_exe='{:?}', ctags_options='{}'",
+                    vi_tags, emacs_tags, ctags_exe, ctags_options);
+       }
+
        let ctags_exe = detect_tags_exe(&ctags_exe)?;
        if verbose {
-           println!("Using configuration: vi_tags='{}', emacs_tags='{}', ctags_options='{}'",
-                    vi_tags, emacs_tags, ctags_options);
-           println!("Found {:?}", ctags_exe);
+           println!("Found ctags executable: {:?}", ctags_exe);
        }
 
        Ok(Config {
