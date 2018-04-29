@@ -78,6 +78,10 @@ The current supported configuration at `~/.rusty-tags/config.toml` (defaults dis
     # the file name used for emacs tags
     emacs_tags = "rusty-tags.emacs"
 
+    # the name or path to the ctags executable, by default executables with names
+    # are searched in the following order: "ctags", "exuberant-ctags", "exctags", "universal-ctags", "uctags"
+    ctags_exe = ""
+
     # options given to the ctags executable
     ctags_options = ""
 
