@@ -60,17 +60,19 @@ impl Config {
        }
 
 
-       let (vi_tags, emacs_tags, ctags_options) = {
+       let (vi_tags, emacs_tags, ctags_exe, ctags_options) = {
            let mut vt = "rusty-tags.vi".to_string();
            let mut et = "rusty-tags.emacs".to_string();
+           let mut cte = None;
            let mut cto = "".to_string();
            if let Some(file_config) = ConfigFromFile::load()? {
                if let Some(fcvt) = file_config.vi_tags { vt = fcvt; }
                if let Some(fcet) = file_config.emacs_tags { et = fcet; }
+               cte = file_config.ctags_exe;
                if let Some(fccto) = file_config.ctags_options { cto = fccto; }
            }
 
-           (vt, et, cto)
+           (vt, et, cte, cto)
        };
 
        let kind = value_t_or_exit!(matches.value_of("TAGS_KIND"), TagsKind);
@@ -83,7 +85,7 @@ impl Config {
            .map(|n| max(1, n))
            .unwrap_or(num_cpus::get_physical() as u32);
 
-       let ctags_exe = detect_tags_exe()?;
+       let ctags_exe = detect_tags_exe(&ctags_exe)?;
        if verbose {
            println!("Using configuration: vi_tags='{}', emacs_tags='{}', ctags_options='{}'",
                     vi_tags, emacs_tags, ctags_options);
@@ -110,6 +112,9 @@ struct ConfigFromFile {
 
     /// the file name used for emacs tags
     emacs_tags: Option<String>,
+
+    /// path to the ctags executable
+    ctags_exe: Option<String>,
 
     /// options given to the ctags executable
     ctags_options: Option<String>
@@ -145,8 +150,14 @@ fn map_file<R, F>(file: &Path, f: F) -> RtResult<R>
     Ok(r)
 }
 
-fn detect_tags_exe() -> RtResult<TagsExe> {
-    for exe in &["ctags", "exuberant-ctags", "universal-ctags"] {
+fn detect_tags_exe(ctags_exe: &Option<String>) -> RtResult<TagsExe> {
+    let exes = if let &Some(ref exe) = ctags_exe {
+        vec![exe.as_str()]
+    } else {
+        vec!["ctags", "exuberant-ctags", "universal-ctags"]
+    };
+
+    for exe in &exes {
         let mut cmd = Command::new(exe);
         cmd.arg("--version");
 
@@ -162,5 +173,5 @@ fn detect_tags_exe() -> RtResult<TagsExe> {
         }
     }
 
-    Err("Couldn't find 'ctags' executable! Is 'ctags' correctly installed?".into())
+    Err(format!("Couldn't find 'ctags' executable! Searched for executables with names: {:?}. Is 'ctags' correctly installed?", &exes).into())
 }
