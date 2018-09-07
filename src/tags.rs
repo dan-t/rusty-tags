@@ -17,6 +17,14 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
         return Ok(());
     }
 
+    if config.verbose {
+        for deps in &deps_by_depth {
+            for dep in deps {
+                dep.source.print_rebuild_status(config);
+            }
+        }
+    }
+
     if deps_by_depth.len() == 1 && deps_by_depth[0].len() == 1 {
         update_tags_internal(config, deps_by_depth[0][0])?;
     }

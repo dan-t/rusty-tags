@@ -6,6 +6,7 @@ use std::process::Command;
 
 use rt_result::RtResult;
 use dirs::rusty_tags_cache_dir;
+use config::Config;
 
 /// the tree describing the dependencies of the whole cargo project
 #[derive(Debug)]
@@ -97,6 +98,20 @@ impl Source {
 
     pub fn hash(&self) -> String {
         format!("{}-{}", self.name, hash(&self.dir))
+    }
+
+    pub fn print_rebuild_status(&self, config: &Config) {
+        if config.force_recreate {
+            println!("Forced rebuilding of tags for '{}'", self.name);
+        } else if self.kind == SourceKind::Root {
+            println!("Rebuilding tags for cargo project root '{}'", self.name);
+        } else if ! self.cached_tags_file.is_file() {
+            println!("Rebuilding tags for '{}', because of missing cache file at '{:?}'",
+                     self.name, self.cached_tags_file);
+        } else if ! self.tags_file.is_file() {
+            println!("Rebuilding tags for '{}', because of missing tags file at '{:?}'",
+                     self.name, self.tags_file);
+        }
     }
 }
 
