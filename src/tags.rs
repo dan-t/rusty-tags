@@ -113,14 +113,14 @@ pub fn create_tags<P1, P2>(config: &Config, src_dirs: &[P1], tags_file: P2) -> R
         cmd.arg(dir.as_ref());
     }
 
-    with_verbose!(config, || {
+    if config.verbose {
         println!("\nCreating tags ...\n   for source:");
         for dir in src_dirs {
             println!("      {}", dir.as_ref().display());
         }
 
         println!("\n   cached at:\n      {}", tags_file.as_ref().display());
-    });
+    }
 
     let output = cmd.output()
         .map_err(|err| format!("'ctags' execution failed: {}\nIs 'ctags' correctly installed?", err))?;
@@ -166,14 +166,14 @@ fn reexported_sources<'a>(config: &Config,
         return Ok(Vec::new());
     }
 
-    with_verbose!(config, || {
+    if config.verbose {
         println!("\nFound public reexports in '{}' of:", source.name);
         for rcrate in &reexp_crates {
             println!("   {}", rcrate);
         }
 
         println!("");
-    });
+    }
 
     let mut reexp_deps = Vec::new();
     for rcrate in reexp_crates {
@@ -192,14 +192,14 @@ fn merge_tags(config: &Config,
               dependency_tag_files: &[&Path],
               into_tag_file: &Path)
               -> RtResult<()> {
-    with_verbose!(config, || {
+    if config.verbose {
         println!("\nMerging ...\n   tags:");
         println!("      {}", lib_tag_file.display());
         for file in dependency_tag_files {
             println!("      {}", file.display());
         }
         println!("\n   into:\n      {}", into_tag_file.display());
-    });
+    }
 
     match config.tags_spec.kind {
         TagsKind::Vi => {

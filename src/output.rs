@@ -27,11 +27,3 @@ macro_rules! verbose {
         }
     }};
 }
-
-macro_rules! with_verbose {
-    ($config:ident, $func:expr) => {{
-        if $config.verbose {
-            $func();
-        }
-    }};
-}
