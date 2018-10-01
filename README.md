@@ -64,8 +64,8 @@ Or without `rustup` by getting the rust source by yourself:
     $ git checkout stable
     $ export RUST_SRC_PATH=/home/you/rust/src/   # should be defined in your ~/.bashrc
 
-Using `rustup` is the recommended way, because the you will automatically get
-the correct standard library tags of the currently used compiler version.
+Using `rustup` is the recommended way, because then you will automatically get
+the correct standard library tags for the currently used compiler version.
 
 Configuration
 =============
