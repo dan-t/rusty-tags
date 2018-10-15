@@ -1,5 +1,7 @@
 use std::path::Path;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
+
 use serde_json;
 
 use rt_result::RtResult;
@@ -7,15 +9,17 @@ use types::{DepTree, Source, SourceKind};
 use config::Config;
 
 /// Returns the dependency tree of the cargo project.
-pub fn dependency_trees(config: &Config, metadata: &serde_json::Value) -> RtResult<Vec<DepTree>> {
+pub fn dependency_trees(config: &Config, metadata: &serde_json::Value) -> RtResult<Vec<Arc<DepTree>>> {
     let packages = packages(&metadata)?;
     let root_names = root_names(&metadata)?;
     verbose!(config, "Found workspace members: '{:?}'", root_names);
 
     let mut dep_trees = Vec::new();
+    let mut dep_tree_cache: HashMap<&str, Arc<DepTree>> = HashMap::new();
     for name in &root_names {
         let mut dep_graph = DepGraph::new();
-        if let Some(tree) = build_dep_tree(config, name, SourceKind::Root, packages, &mut dep_graph)? {
+        if let Some(tree) = build_dep_tree(config, name, SourceKind::Root, packages,
+                                           &mut dep_graph, &mut dep_tree_cache, 0)? {
             dep_trees.push(tree);
         }
     }
@@ -60,39 +64,54 @@ fn build_dep_tree<'a>(config: &Config,
                       src_name: &'a str,
                       kind: SourceKind,
                       packages: &'a Vec<serde_json::Value>,
-                      dep_graph: &mut DepGraph<'a>)
-                      -> RtResult<Option<DepTree>> {
+                      dep_graph: &mut DepGraph<'a>,
+                      dep_tree_cache: &mut HashMap<&'a str, Arc<DepTree>>,
+                      level: u32)
+                      -> RtResult<Option<Arc<DepTree>>> {
     if dep_graph.contains(src_name) {
-        verbose!(config, "\nFound cyclic dependency on source '{}' in dependency graph:\n{:?}\n", src_name, dep_graph.get());
+        verbose!(config, "\n[{}] Found cyclic dependency on source {:?}='{}' in dependency graph:\n{:?}\n", level, kind, src_name, dep_graph.get());
         return Ok(None);
+    }
+
+    if let Some(dep_tree) = dep_tree_cache.get(src_name) {
+        verbose!(config, "[{}] Reusing cached tree for source {:?}='{}'", level, kind, src_name);
+        return Ok(Some(dep_tree.clone()));
     }
 
     dep_graph.push(src_name);
 
-    let mut dep_tree = None;
+    let mut opt_dep_tree = None;
     if let Some(pkg) = find_package(src_name, packages) {
-        verbose!(config, "Found package of '{}'", src_name);
+        verbose!(config, "[{}] Found package of {:?}='{}'", level, kind, src_name);
         if let Some(src_path) = src_path(config, pkg, kind)? {
             let mut dep_trees = Vec::new();
             if !config.omit_deps {
                 let dep_names = dependency_names(pkg)?;
-                verbose!(config, "Found dependencies of '{}': '{:?}'", src_name, dep_names);
+                if ! dep_names.is_empty() {
+                    verbose!(config, "[{}] Found dependencies of {:?}='{}': '{:?}'", level, kind, src_name, dep_names);
+                }
+
                 for name in &dep_names {
-                    if let Some(tree) = build_dep_tree(config, name, SourceKind::Dep, packages, dep_graph)? {
-                        dep_trees.push(Box::new(tree));
+                    if let Some(tree) = build_dep_tree(config, name, SourceKind::Dep, packages,
+                                                       dep_graph, dep_tree_cache, level + 1)? {
+                        dep_trees.push(tree);
                     }
                 }
             }
 
-            dep_tree = Some(DepTree {
+            verbose!(config, "[{}] Building tree for source {:?}='{}'", level, kind, src_name);
+            let dep_tree = Arc::new(DepTree {
                 source: Source::new(kind, src_name, src_path, &config.tags_spec)?,
                 dependencies: dep_trees
             });
+
+            dep_tree_cache.insert(src_name, dep_tree.clone());
+            opt_dep_tree = Some(dep_tree);
         }
     }
 
     dep_graph.pop();
-    Ok(dep_tree)
+    Ok(opt_dep_tree)
 }
 
 fn root_names(metadata: &serde_json::Value) -> RtResult<Vec<&str>> {

@@ -3,6 +3,7 @@ use std::fs;
 use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
 use std::process::Command;
+use std::sync::Arc;
 
 use rt_result::RtResult;
 use dirs::rusty_tags_cache_dir;
@@ -12,7 +13,7 @@ use config::Config;
 #[derive(Debug)]
 pub struct DepTree {
     pub source: Source,
-    pub dependencies: Vec<Box<DepTree>>
+    pub dependencies: Vec<Arc<DepTree>>
 }
 
 impl DepTree {
