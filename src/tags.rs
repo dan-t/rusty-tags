@@ -28,7 +28,7 @@ pub fn update_tags<'a>(config: &Config,
             }
 
             if config.verbose {
-                dep.source.print_rebuild_status(config);
+                dep.source.print_recreate_status(config);
             }
 
             updated_trees.insert(&dep.source.hash);

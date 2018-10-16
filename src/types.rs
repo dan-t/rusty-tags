@@ -92,7 +92,7 @@ impl Source {
     }
 
     pub fn needs_tags_update(&self) -> bool {
-        // tags of the root (the cargo project) should be always rebuild
+        // tags of the root (the cargo project) should be always recreated
         if self.kind == SourceKind::Root {
             return true;
         }
@@ -100,16 +100,16 @@ impl Source {
         ! self.cached_tags_file.is_file() || ! self.tags_file.is_file()
     }
 
-    pub fn print_rebuild_status(&self, config: &Config) {
+    pub fn print_recreate_status(&self, config: &Config) {
         if config.force_recreate {
-            println!("Forced rebuilding of tags for '{}'", self.name);
+            println!("Forced recreating of tags for '{}'", self.name);
         } else if self.kind == SourceKind::Root {
-            println!("Rebuilding tags for cargo project root '{}'", self.name);
+            println!("Recreating tags for cargo project root '{}'", self.name);
         } else if ! self.cached_tags_file.is_file() {
-            println!("Rebuilding tags for '{}', because of missing cache file at '{:?}'",
+            println!("Recreating tags for '{}', because of missing cache file at '{:?}'",
                      self.name, self.cached_tags_file);
         } else if ! self.tags_file.is_file() {
-            println!("Rebuilding tags for '{}', because of missing tags file at '{:?}'",
+            println!("Recreating tags for '{}', because of missing tags file at '{:?}'",
                      self.name, self.tags_file);
         }
     }
