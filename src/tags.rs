@@ -10,35 +10,38 @@ use types::{TagsKind, Source, DepTree, WhichDep};
 use config::Config;
 use dirs::rusty_tags_cache_dir;
 
-pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
+pub fn update_tags<'a>(config: &Config,
+                       dep_tree: &'a DepTree,
+                       updated_trees: &mut HashSet<&'a str>,
+                       thread_pool: &mut Pool)
+                       -> RtResult<()> {
     let which_deps = if config.force_recreate { WhichDep::All } else { WhichDep::NeedsTagsUpdate };
     let deps_by_depth = dep_tree.deps_by_depth(which_deps);
     if deps_by_depth.is_empty() {
         return Ok(());
     }
 
-    if config.verbose {
-        for deps in &deps_by_depth {
-            for dep in deps {
+    for deps in &deps_by_depth {
+        let deps_to_update = deps.into_iter().filter(|&dep| {
+            if updated_trees.contains(&dep.source.hash as &str) {
+                return false;
+            }
+
+            if config.verbose {
                 dep.source.print_rebuild_status(config);
             }
-        }
-    }
 
-    if deps_by_depth.len() == 1 && deps_by_depth[0].len() == 1 {
-        update_tags_internal(config, deps_by_depth[0][0])?;
-    }
-    else {
-        let mut thread_pool = Pool::new(config.num_threads);
-        for deps in &deps_by_depth {
-            thread_pool.scoped(|scoped| {
-                for dep in deps {
-                    scoped.execute(move || {
-                        update_tags_internal(config, dep).unwrap();
-                    });
-                }
-            });
-        }
+            updated_trees.insert(&dep.source.hash);
+            return true;
+        });
+
+        thread_pool.scoped(|scoped| {
+            for dep in deps_to_update {
+                scoped.execute(move || {
+                    update_tags_internal(config, dep).unwrap();
+                });
+            }
+        });
     }
 
     return Ok(());

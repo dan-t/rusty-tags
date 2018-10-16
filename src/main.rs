@@ -22,7 +22,10 @@ use std::io::{self, Write};
 use std::process::Command;
 use std::env;
 use std::fs::{File, remove_file};
+use std::collections::HashSet;
+
 use tempfile::NamedTempFile;
+use scoped_threadpool::Pool;
 
 use rt_result::RtResult;
 use dependencies::dependency_trees;
@@ -58,8 +61,10 @@ fn update_all_tags(config: &Config) -> RtResult<()> {
     update_std_lib_tags(&config)?;
 
     let dep_trees = dependency_trees(&config, &metadata)?;
+    let mut updated_trees = HashSet::new();
+    let mut thread_pool = Pool::new(config.num_threads);
     for tree in &dep_trees {
-        let lock_file = rusty_tags_locks_dir()?.join(tree.source.hash());
+        let lock_file = rusty_tags_locks_dir()?.join(&tree.source.hash);
         if lock_file.is_file() {
             info!(config, "Already creating tags for '{}', if this isn't the case remove the lock file '{}'",
                   tree.source.name, lock_file.display());
@@ -74,7 +79,7 @@ fn update_all_tags(config: &Config) -> RtResult<()> {
         };
 
         info!(config, "Creating tags for '{}' ...", tree.source.name);
-        update_tags(&config, &tree)?;
+        update_tags(&config, &tree, &mut updated_trees, &mut thread_pool)?;
     }
 
     Ok(())
