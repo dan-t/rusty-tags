@@ -8,6 +8,8 @@ use rt_result::RtResult;
 use types::{DepTree, Source, SourceKind};
 use config::Config;
 
+type SourceName = str;
+
 /// Returns the dependency tree of the cargo project.
 pub fn dependency_trees(config: &Config, metadata: &serde_json::Value) -> RtResult<Vec<Arc<DepTree>>> {
     let packages = packages(&metadata)?;
@@ -15,7 +17,7 @@ pub fn dependency_trees(config: &Config, metadata: &serde_json::Value) -> RtResu
     verbose!(config, "Found workspace members: '{:?}'", root_names);
 
     let mut dep_trees = Vec::new();
-    let mut dep_tree_cache: HashMap<&str, Arc<DepTree>> = HashMap::new();
+    let mut dep_tree_cache: HashMap<&SourceName, Arc<DepTree>> = HashMap::new();
     for name in &root_names {
         let mut dep_graph = DepGraph::new();
         if let Some(tree) = build_dep_tree(config, name, SourceKind::Root, packages,
@@ -65,7 +67,7 @@ fn build_dep_tree<'a>(config: &Config,
                       kind: SourceKind,
                       packages: &'a Vec<serde_json::Value>,
                       dep_graph: &mut DepGraph<'a>,
-                      dep_tree_cache: &mut HashMap<&'a str, Arc<DepTree>>,
+                      dep_tree_cache: &mut HashMap<&'a SourceName, Arc<DepTree>>,
                       level: u32)
                       -> RtResult<Option<Arc<DepTree>>> {
     if dep_graph.contains(src_name) {
