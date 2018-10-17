@@ -10,7 +10,9 @@ use rt_result::RtResult;
 use dirs::rusty_tags_cache_dir;
 use config::Config;
 
-/// the tree describing the dependencies of the whole cargo project
+/// The tree describing the dependencies of the whole cargo project.
+/// In the case of a cargo workspace, there's a separate 'DepTree'
+/// for every member of the workspace.
 #[derive(Debug)]
 pub struct DepTree {
     pub source: Source,
@@ -74,10 +76,12 @@ pub enum WhichDep {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SourceKind {
-    /// the source of the cargo project
+    /// The source of the cargo project. In the case
+    /// of a cargo workspace, there's a 'Root' for
+    /// every member of the workspace.
     Root,
 
-    /// the source of a dependency
+    /// The source of a dependency.
     Dep
 }
 
@@ -112,7 +116,10 @@ impl Source {
     }
 
     pub fn needs_tags_update(&self) -> bool {
-        // tags of the root (the cargo project) should be always recreated
+        // Tags of the root (the cargo project) should be always recreated,
+        // because we don't know which source file has been changed and
+        // even if we would know it, we couldn't easily just replace the
+        // tags of the changed source file.
         if self.kind == SourceKind::Root {
             return true;
         }
