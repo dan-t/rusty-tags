@@ -6,13 +6,13 @@ use tempfile::NamedTempFile;
 use scoped_threadpool::Pool;
 
 use rt_result::RtResult;
-use types::{TagsKind, Source, DepTree, WhichDep};
+use types::{TagsKind, Source, Sources, DepTree, WhichDep};
 use config::Config;
 use dirs::rusty_tags_cache_dir;
 
 pub fn update_tags<'a>(config: &Config,
                        dep_tree: &'a DepTree,
-                       updated_trees: &mut HashSet<&'a str>,
+                       updated_sources: &mut Sources<'a>,
                        thread_pool: &mut Pool)
                        -> RtResult<()> {
     let which_deps = if config.force_recreate { WhichDep::All } else { WhichDep::NeedsTagsUpdate };
@@ -23,7 +23,7 @@ pub fn update_tags<'a>(config: &Config,
 
     for deps in &deps_by_depth {
         let deps_to_update = deps.into_iter().filter(|&dep| {
-            if updated_trees.contains(&dep.source.hash as &str) {
+            if updated_sources.contains(&dep.source) {
                 return false;
             }
 
@@ -31,7 +31,7 @@ pub fn update_tags<'a>(config: &Config,
                 dep.source.print_recreate_status(config);
             }
 
-            updated_trees.insert(&dep.source.hash);
+            updated_sources.insert(&dep.source);
             return true;
         });
 

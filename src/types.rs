@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
+use std::collections::HashSet;
 use std::process::Command;
 use std::sync::Arc;
 
@@ -43,6 +44,25 @@ impl DepTree {
         for dep in &self.dependencies {
             dep.deps_by_depth_internal(depth + 1, which, deps);
         }
+    }
+}
+
+/// A set of sources.
+pub struct Sources<'a> {
+    sources: HashSet<&'a str>
+}
+
+impl<'a> Sources<'a> {
+    pub fn new() -> Sources<'a> {
+        Sources { sources: HashSet::new() }
+    }
+
+    pub fn insert(&mut self, source: &'a Source) {
+        self.sources.insert(&source.hash);
+    }
+
+    pub fn contains(&self, source: &'a Source) -> bool {
+        self.sources.contains(&source.hash as &str)
     }
 }
 
