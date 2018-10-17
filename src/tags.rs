@@ -15,20 +15,26 @@ pub fn update_tags<'a>(config: &Config,
                        updated_sources: &mut Sources<'a>,
                        thread_pool: &mut Pool)
                        -> RtResult<()> {
-    let filter_dep_trees = |dep_tree: &DepTree| {
-        if config.force_recreate {
-            return true;
-        }
+    let deps_grouped_by_depth = {
+        let filter_dep_trees = |dep_tree: &DepTree| {
+            if updated_sources.contains(&dep_tree.source) {
+                return false;
+            }
 
-        dep_tree.source.needs_tags_update()
+            if config.force_recreate {
+                return true;
+            }
+
+            dep_tree.source.needs_tags_update()
+        };
+
+        // Get deps grouped by their depth and reverse them, so that the deps
+        // with the highest tree depth are in front.
+        dep_tree.grouped_by_depth(filter_dep_trees)
+                .into_iter()
+                .rev()
+                .collect::<Vec<_>>()
     };
-
-    // Get deps grouped by their depth and reverse them, so that the deps
-    // with the highest tree depth are in front.
-    let deps_grouped_by_depth = dep_tree.grouped_by_depth(filter_dep_trees)
-                                        .into_iter()
-                                        .rev()
-                                        .collect::<Vec<_>>();
 
     if deps_grouped_by_depth.is_empty() {
         return Ok(());
