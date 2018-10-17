@@ -20,31 +20,39 @@ pub struct DepTree {
 }
 
 impl DepTree {
+    /// The sources of the direct dependencies of the 'DepTree'.
     pub fn direct_dep_sources(&self) -> Vec<&Source> {
         self.dependencies.iter()
             .map(|d| &d.source)
             .collect()
     }
 
-    pub fn deps_by_depth(&self, which: WhichDep) -> Vec<Vec<&DepTree>> {
+    /// Get the 'DepTrees' for which 'predicate' returns true grouped by their tree depth.
+    /// So the first entry of the returned 'Vec' contains the root, the second all
+    /// 'DepTrees' of the first level, the third all 'DepTrees' of the second level ...
+    pub fn grouped_by_depth<P>(&self, predicate: P) -> Vec<Vec<&DepTree>>
+        where P: Fn(&DepTree) -> bool
+    {
         let mut deps = Vec::with_capacity(50);
-        self.deps_by_depth_internal(0, which, &mut deps);
-        deps.into_iter().rev().collect()
-    }
+        exec(self, 0, &predicate, &mut deps);
+        return deps;
 
-    fn deps_by_depth_internal<'a>(&'a self, depth: usize, which: WhichDep, deps: &mut Vec<Vec<&'a DepTree>>) {
-        if which == WhichDep::NeedsTagsUpdate && ! self.source.needs_tags_update() {
-            return;
-        }
+        fn exec<'a, P>(dep_tree: &'a DepTree, depth: usize, predicate: &P, deps: &mut Vec<Vec<&'a DepTree>>)
+            where P: Fn(&DepTree) -> bool
+        {
+            if ! predicate(dep_tree) {
+                return
+            }
 
-        if deps.len() <= depth {
-            deps.push(Vec::with_capacity(50));
-        }
+            if deps.len() <= depth {
+                deps.push(Vec::with_capacity(50));
+            }
 
-        deps[depth].push(&self);
+            deps[depth].push(dep_tree);
 
-        for dep in &self.dependencies {
-            dep.deps_by_depth_internal(depth + 1, which, deps);
+            for dep in &dep_tree.dependencies {
+                exec(dep, depth + 1, predicate, deps);
+            }
         }
     }
 }
@@ -66,12 +74,6 @@ impl<'a> Sources<'a> {
     pub fn contains(&self, source: &'a Source) -> bool {
         self.sources.contains(&source.hash as &str)
     }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum WhichDep {
-    All,
-    NeedsTagsUpdate
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

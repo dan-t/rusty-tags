@@ -6,7 +6,7 @@ use tempfile::NamedTempFile;
 use scoped_threadpool::Pool;
 
 use rt_result::RtResult;
-use types::{TagsKind, Source, Sources, DepTree, WhichDep};
+use types::{TagsKind, Source, Sources, DepTree};
 use config::Config;
 use dirs::rusty_tags_cache_dir;
 
@@ -15,13 +15,28 @@ pub fn update_tags<'a>(config: &Config,
                        updated_sources: &mut Sources<'a>,
                        thread_pool: &mut Pool)
                        -> RtResult<()> {
-    let which_deps = if config.force_recreate { WhichDep::All } else { WhichDep::NeedsTagsUpdate };
-    let deps_by_depth = dep_tree.deps_by_depth(which_deps);
-    if deps_by_depth.is_empty() {
+    let filter_dep_trees = |dep_tree: &DepTree| {
+        if config.force_recreate {
+            return true;
+        }
+
+        dep_tree.source.needs_tags_update()
+    };
+
+    // Get deps grouped by their depth and reverse them, so that the deps
+    // with the highest tree depth are in front.
+    let deps_grouped_by_depth = dep_tree.grouped_by_depth(filter_dep_trees)
+                                        .into_iter()
+                                        .rev()
+                                        .collect::<Vec<_>>();
+
+    if deps_grouped_by_depth.is_empty() {
         return Ok(());
     }
 
-    for deps in &deps_by_depth {
+    // Update the sources bottom up, starting at the bottom
+    // of the 'DepTree'. Each tree level is updated in parallel.
+    for deps in &deps_grouped_by_depth {
         let deps_to_update = deps.into_iter().filter(|&dep| {
             if updated_sources.contains(&dep.source) {
                 return false;
@@ -47,10 +62,6 @@ pub fn update_tags<'a>(config: &Config,
     return Ok(());
 
     fn update_tags_internal(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
-        if ! config.force_recreate && ! dep_tree.source.needs_tags_update() {
-            return Ok(());
-        }
-
         // create a separate temporary file for every tags file
         // and don't share any temporary directories
 
