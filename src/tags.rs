@@ -10,6 +10,9 @@ use types::{TagsKind, Source, Sources, DepTree};
 use config::Config;
 use dirs::rusty_tags_cache_dir;
 
+/// Update the tags of all sources of 'dep_tree'. Only
+/// updates the tags of sources not contained in 'updated_sources'.
+/// Uses 'thread_pool' to update the tags in parallel.
 pub fn update_tags<'a>(config: &Config,
                        dep_tree: &'a DepTree,
                        updated_sources: &mut Sources<'a>,
