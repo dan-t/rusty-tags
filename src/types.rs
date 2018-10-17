@@ -27,20 +27,26 @@ impl DepTree {
             .collect()
     }
 
-    /// Get the 'DepTrees' for which 'predicate' returns true grouped by their tree depth.
-    /// So the first entry of the returned 'Vec' contains the root, the second all
-    /// 'DepTrees' of the first level, the third all 'DepTrees' of the second level ...
-    pub fn grouped_by_depth<P>(&self, predicate: P) -> Vec<Vec<&DepTree>>
+    /// Get the unique 'DepTrees' - the same 'DepTree' is only returned once - for which
+    /// 'predicate' returns true grouped by their tree depth. So the first entry of the returned
+    /// 'Vec' contains the root, the second all 'DepTrees' of the first level, the third all
+    /// 'DepTrees' of the second level ...
+    pub fn unique_grouped_by_depth<P>(&self, predicate: P) -> Vec<Vec<&DepTree>>
         where P: Fn(&DepTree) -> bool
     {
         let mut deps = Vec::with_capacity(50);
-        exec(self, 0, &predicate, &mut deps);
+        let mut unique_sources = Sources::new();
+        exec(self, 0, &predicate, &mut unique_sources, &mut deps);
         return deps;
 
-        fn exec<'a, P>(dep_tree: &'a DepTree, depth: usize, predicate: &P, deps: &mut Vec<Vec<&'a DepTree>>)
+        fn exec<'a, P>(dep_tree: &'a DepTree,
+                       depth: usize,
+                       predicate: &P,
+                       unique_sources: &mut Sources<'a>,
+                       deps: &mut Vec<Vec<&'a DepTree>>)
             where P: Fn(&DepTree) -> bool
         {
-            if ! predicate(dep_tree) {
+            if ! predicate(dep_tree) || unique_sources.contains(&dep_tree.source) {
                 return
             }
 
@@ -49,9 +55,10 @@ impl DepTree {
             }
 
             deps[depth].push(dep_tree);
+            unique_sources.insert(&dep_tree.source);
 
             for dep in &dep_tree.dependencies {
-                exec(dep, depth + 1, predicate, deps);
+                exec(dep, depth + 1, predicate, unique_sources, deps);
             }
         }
     }

@@ -33,7 +33,7 @@ pub fn update_tags<'a>(config: &Config,
 
         // Get deps grouped by their depth and reverse them, so that the deps
         // with the highest tree depth are in front.
-        dep_tree.grouped_by_depth(filter_dep_trees)
+        dep_tree.unique_grouped_by_depth(filter_dep_trees)
                 .into_iter()
                 .rev()
                 .collect::<Vec<_>>()
@@ -46,26 +46,23 @@ pub fn update_tags<'a>(config: &Config,
     // Update the sources bottom up, starting at the bottom
     // of the 'DepTree'. Each tree level is updated in parallel.
     for deps in &deps_grouped_by_depth {
-        let deps_to_update = deps.into_iter().filter(|&dep| {
-            if updated_sources.contains(&dep.source) {
-                return false;
-            }
-
-            if config.verbose {
+        if config.verbose {
+            for dep in deps {
                 dep.source.print_recreate_status(config);
             }
-
-            updated_sources.insert(&dep.source);
-            return true;
-        });
+        }
 
         thread_pool.scoped(|scoped| {
-            for dep in deps_to_update {
+            for dep in deps {
                 scoped.execute(move || {
                     update_tags_internal(config, dep).unwrap();
                 });
             }
         });
+
+        for dep in deps {
+            updated_sources.insert(&dep.source);
+        }
     }
 
     return Ok(());
