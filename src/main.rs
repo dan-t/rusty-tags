@@ -4,6 +4,7 @@ extern crate num_cpus;
 extern crate scoped_threadpool;
 extern crate serde;
 extern crate serde_json;
+extern crate streaming_iterator;
 
 #[macro_use]
 extern crate serde_derive;
@@ -14,24 +15,18 @@ extern crate clap;
 #[macro_use]
 extern crate lazy_static;
 
-#[macro_use(defer)]
-extern crate scopeguard;
-
 use std::path::Path;
 use std::io::{self, Write};
 use std::process::Command;
 use std::env;
-use std::fs::{File, remove_file};
 
 use tempfile::NamedTempFile;
-use scoped_threadpool::Pool;
 
 use rt_result::RtResult;
-use dependencies::dependency_trees;
+use dependencies::project_roots;
 use tags::{update_tags, create_tags, move_tags};
 use config::Config;
-use dirs::rusty_tags_locks_dir;
-use types::Sources;
+use types::SourceLock;
 
 #[macro_use]
 mod output;
@@ -60,28 +55,25 @@ fn update_all_tags(config: &Config) -> RtResult<()> {
     let metadata = fetch_source_and_metadata(&config)?;
     update_std_lib_tags(&config)?;
 
-    let dep_trees = dependency_trees(&config, &metadata)?;
-    let mut updated_sources = Sources::new();
-    let mut thread_pool = Pool::new(config.num_threads);
-    for tree in &dep_trees {
-        let lock_file = rusty_tags_locks_dir()?.join(&tree.source.hash);
-        if lock_file.is_file() {
-            info!(config, "Already creating tags for '{}', if this isn't the case remove the lock file '{}'",
-                  tree.source.name, lock_file.display());
-            continue;
-        }
-
-        File::create(&lock_file)?;
-        defer! {
-            if lock_file.is_file() {
-                let _ = remove_file(&lock_file);
+    let roots = project_roots(&config, &metadata)?;
+    let mut unlocked_roots = Vec::new();
+    let mut source_locks = Vec::new();
+    for root in roots {
+        match root.source.lock()? {
+            SourceLock::AlreadyLocked { ref path } => {
+                info!(config, "Already creating tags for '{}', if this isn't the case remove the lock file '{}'",
+                      root.source.name, path.display());
+                continue;
             }
-        };
 
-        info!(config, "Creating tags for '{}' ...", tree.source.name);
-        update_tags(&config, &tree, &mut updated_sources, &mut thread_pool)?;
+            sl@SourceLock::Locked { .. } => {
+                source_locks.push(sl);
+                unlocked_roots.push(root);
+            }
+        }
     }
 
+    update_tags(&config, unlocked_roots)?;
     Ok(())
 }
 

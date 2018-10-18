@@ -1,13 +1,15 @@
 use std::path::{Path, PathBuf};
-use std::fs;
+use std::fs::{self, File};
 use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
-use std::collections::HashSet;
 use std::process::Command;
+use std::cmp::Ordering;
+use std::ops::Drop;
 use std::sync::Arc;
 
+use streaming_iterator::StreamingIterator;
 use rt_result::RtResult;
-use dirs::rusty_tags_cache_dir;
+use dirs::{rusty_tags_cache_dir, rusty_tags_locks_dir};
 use config::Config;
 
 /// The tree describing the dependencies of the whole cargo project.
@@ -19,67 +21,120 @@ pub struct DepTree {
     pub dependencies: Vec<Arc<DepTree>>
 }
 
+pub struct DepthWithTree<'a> {
+    pub depth: usize,
+    pub tree: &'a DepTree
+}
+
 impl DepTree {
-    /// The sources of the direct dependencies of the 'DepTree'.
-    pub fn direct_dep_sources(&self) -> Vec<&Source> {
+    /// The sources of the children of the 'DepTree'.
+    pub fn children_sources(&self) -> Vec<&Source> {
         self.dependencies.iter()
             .map(|d| &d.source)
             .collect()
     }
+}
 
-    /// Get the unique 'DepTrees' - the same 'DepTree' is only returned once - for which
-    /// 'predicate' returns true grouped by their tree depth. So the first entry of the returned
-    /// 'Vec' contains the root, the second all 'DepTrees' of the first level, the third all
-    /// 'DepTrees' of the second level ...
-    pub fn unique_grouped_by_depth<P>(&self, predicate: P) -> Vec<Vec<&DepTree>>
+/// Split the whole trees by their depth, starting with the highest depth,
+/// Each unique 'DepTree' is returned once with its highest depth. Only
+/// 'DepTree' are considered for which 'predicate' returns true.
+pub fn split_by_depth<'a, P>(roots: &'a Vec<Arc<DepTree>>,
+                             predicate: P)
+                             -> SplitByDepth<'a>
+    where P: Fn(&DepTree) -> bool
+{
+    let mut dep_trees = Vec::with_capacity(10000);
+    for root in roots {
+        collect(root, 0, &predicate, &mut dep_trees);
+    }
+
+    // sort first by source and then by higher depth
+    dep_trees.sort_unstable_by(|a, b| {
+        let ord = a.tree.source.hash.cmp(&b.tree.source.hash);
+        if ord != Ordering::Equal {
+            return ord;
+        }
+
+        b.depth.cmp(&a.depth)
+    });
+
+    // dedup to source with highest depth
+    dep_trees.dedup_by_key(|i| &i.tree.source.hash);
+
+    // sort sources by higher depth
+    dep_trees.sort_unstable_by(|a, b| b.depth.cmp(&a.depth));
+
+    return SplitByDepth::new(dep_trees);
+
+    fn collect<'a, P>(dep_tree: &'a DepTree,
+                      depth: usize,
+                      predicate: &P,
+                      dep_trees: &mut Vec<DepthWithTree<'a>>)
         where P: Fn(&DepTree) -> bool
     {
-        let mut deps = Vec::with_capacity(50);
-        let mut unique_sources = Sources::new();
-        exec(self, 0, &predicate, &mut unique_sources, &mut deps);
-        return deps;
+        if ! predicate(dep_tree) {
+            return;
+        }
 
-        fn exec<'a, P>(dep_tree: &'a DepTree,
-                       depth: usize,
-                       predicate: &P,
-                       unique_sources: &mut Sources<'a>,
-                       deps: &mut Vec<Vec<&'a DepTree>>)
-            where P: Fn(&DepTree) -> bool
-        {
-            if ! predicate(dep_tree) || unique_sources.contains(&dep_tree.source) {
-                return
-            }
+        dep_trees.push(DepthWithTree { depth, tree: dep_tree });
 
-            if deps.len() <= depth {
-                deps.push(Vec::with_capacity(50));
-            }
-
-            deps[depth].push(dep_tree);
-            unique_sources.insert(&dep_tree.source);
-
-            for dep in &dep_tree.dependencies {
-                exec(dep, depth + 1, predicate, unique_sources, deps);
-            }
+        for dep in &dep_tree.dependencies {
+            collect(dep, depth + 1, predicate, dep_trees);
         }
     }
 }
 
-/// A set of sources.
-pub struct Sources<'a> {
-    sources: HashSet<&'a str>
+/// Split the 'dep_trees' in continous regions of the same depth.
+pub struct SplitByDepth<'a> {
+    dep_trees: Vec<DepthWithTree<'a>>,
+
+    first_idx: usize,
+    cur_depth: usize,
+    cur_idx: usize,
 }
 
-impl<'a> Sources<'a> {
-    pub fn new() -> Sources<'a> {
-        Sources { sources: HashSet::new() }
+impl<'a> SplitByDepth<'a> {
+    pub fn new(dep_trees: Vec<DepthWithTree<'a>>) -> SplitByDepth<'a> {
+        SplitByDepth {
+            first_idx: 0,
+            cur_depth: if dep_trees.is_empty() { 0 } else { dep_trees[0].depth },
+            cur_idx: 0,
+            dep_trees: dep_trees
+        }
+    }
+}
+
+impl<'a> StreamingIterator for SplitByDepth<'a> {
+    type Item = [DepthWithTree<'a>];
+
+    #[inline]
+    fn advance(&mut self) {
+        if self.cur_idx > self.dep_trees.len() {
+            return;
+        }
+
+        self.first_idx = self.cur_idx;
+        self.cur_idx += 1;
+
+        self.cur_depth = if self.first_idx < self.dep_trees.len() {
+            self.dep_trees[self.first_idx].depth
+        } else {
+            0
+        };
+
+        while self.cur_idx < self.dep_trees.len()
+                  && self.cur_depth == self.dep_trees[self.cur_idx].depth {
+            self.cur_idx += 1;
+        }
     }
 
-    pub fn insert(&mut self, source: &'a Source) {
-        self.sources.insert(&source.hash);
-    }
+    #[inline]
+    fn get(&self) -> Option<&Self::Item> {
+        if self.cur_idx > self.dep_trees.len() {
+            return None;
+        }
 
-    pub fn contains(&self, source: &'a Source) -> bool {
-        self.sources.contains(&source.hash as &str)
+        Some(&self.dep_trees[self.first_idx .. self.cur_idx])
     }
 }
 
@@ -92,6 +147,47 @@ pub enum SourceKind {
 
     /// The source of a dependency.
     Dep
+}
+
+/// Lock a source to prevent that multiple running instances
+/// of 'rusty-tags' update the same source.
+pub enum SourceLock {
+    Locked {
+        path: PathBuf,
+        file: File
+    },
+
+    AlreadyLocked {
+        path: PathBuf
+    }
+}
+
+impl SourceLock {
+    fn new(source: &Source) -> RtResult<SourceLock> {
+        let lock_file = rusty_tags_locks_dir()?.join(&source.hash);
+        if lock_file.is_file() {
+            Ok(SourceLock::AlreadyLocked { path: lock_file })
+        } else {
+            Ok(SourceLock::Locked {
+                file: File::create(&lock_file)?,
+                path: lock_file
+            })
+        }
+    }
+}
+
+impl Drop for SourceLock {
+    fn drop(&mut self) {
+        match self {
+            SourceLock::Locked { path, .. } => {
+                if path.is_file() {
+                    let _ = fs::remove_file(&path);
+                }
+            }
+
+            SourceLock::AlreadyLocked { .. } => {}
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -147,7 +243,13 @@ impl Source {
         } else if ! self.tags_file.is_file() {
             println!("Recreating tags for '{}', because of missing tags file at '{:?}'",
                      self.name, self.tags_file);
+        } else {
+            println!("No recreation needed for '{}'", self.name);
         }
+    }
+
+    pub fn lock(&self) -> RtResult<SourceLock> {
+        SourceLock::new(self)
     }
 }
 

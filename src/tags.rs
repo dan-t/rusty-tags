@@ -2,28 +2,26 @@ use std::fs::{File, OpenOptions, copy, rename};
 use std::io::{Read, Write};
 use std::collections::HashSet;
 use std::path::Path;
+use std::sync::Arc;
+
 use tempfile::NamedTempFile;
 use scoped_threadpool::Pool;
+use streaming_iterator::StreamingIterator;
 
 use rt_result::RtResult;
-use types::{TagsKind, Source, Sources, DepTree};
+use types::{TagsKind, Source, DepTree, DepthWithTree, split_by_depth};
 use config::Config;
 use dirs::rusty_tags_cache_dir;
 
-/// Update the tags of all sources of 'dep_tree'. Only
-/// updates the tags of sources not contained in 'updated_sources'.
-/// Uses 'thread_pool' to update the tags in parallel.
-pub fn update_tags<'a>(config: &Config,
-                       dep_tree: &'a DepTree,
-                       updated_sources: &mut Sources<'a>,
-                       thread_pool: &mut Pool)
-                       -> RtResult<()> {
-    let deps_grouped_by_depth = {
-        let filter_dep_trees = |dep_tree: &DepTree| {
-            if updated_sources.contains(&dep_tree.source) {
-                return false;
-            }
+/// Update the tags of all sources of 'roots'.
+pub fn update_tags(config: &Config, roots: Vec<Arc<DepTree>>) -> RtResult<()> {
+    if ! config.quiet {
+        let names: Vec<_> = roots.iter().map(|dt| &dt.source.name).collect();
+        println!("Creating tags for: {:?} ...", names);
+    }
 
+    let mut dep_trees = {
+        let filter_dep_trees = |dep_tree: &DepTree| {
             if config.force_recreate {
                 return true;
             }
@@ -31,38 +29,25 @@ pub fn update_tags<'a>(config: &Config,
             dep_tree.source.needs_tags_update()
         };
 
-        // Get deps grouped by their depth and reverse them, so that the deps
-        // with the highest tree depth are in front.
-        dep_tree.unique_grouped_by_depth(filter_dep_trees)
-                .into_iter()
-                .rev()
-                .collect::<Vec<_>>()
+        split_by_depth(&roots, filter_dep_trees)
     };
 
-    if deps_grouped_by_depth.is_empty() {
-        return Ok(());
-    }
-
-    // Update the sources bottom up, starting at the bottom
-    // of the 'DepTree'. Each tree level is updated in parallel.
-    for deps in &deps_grouped_by_depth {
+    let mut thread_pool = Pool::new(config.num_threads);
+    while let Some(trees) = dep_trees.next() {
         if config.verbose {
-            for dep in deps {
-                dep.source.print_recreate_status(config);
+            println!("Sources of depth={}", trees[0].depth);
+            for DepthWithTree { tree, .. } in trees {
+                tree.source.print_recreate_status(config);
             }
         }
 
         thread_pool.scoped(|scoped| {
-            for dep in deps {
+            for DepthWithTree { tree, .. } in trees {
                 scoped.execute(move || {
-                    update_tags_internal(config, dep).unwrap();
+                    update_tags_internal(config, tree).unwrap();
                 });
             }
         });
-
-        for dep in deps {
-            updated_sources.insert(&dep.source);
-        }
     }
 
     return Ok(());
@@ -74,14 +59,14 @@ pub fn update_tags<'a>(config: &Config,
         let tmp_src_tags = NamedTempFile::new()?;
         create_tags(config, &[&dep_tree.source.dir], tmp_src_tags.path())?;
 
-        let direct_dep_sources = dep_tree.direct_dep_sources();
+        let children_sources = dep_tree.children_sources();
 
         // create the cached tags file of 'dep_tree.source' which
         // might also contain the tags of dependencies if they're
         // reexported
         {
             let cached_tags_file = &dep_tree.source.cached_tags_file;
-            let reexp_sources = reexported_sources(config, &dep_tree.source, &direct_dep_sources)?;
+            let reexp_sources = reexported_sources(config, &dep_tree.source, &children_sources)?;
             let mut reexp_tags_files = Vec::new();
             for source in &reexp_sources {
                 reexp_tags_files.push(source.cached_tags_file.as_path());
@@ -101,7 +86,7 @@ pub fn update_tags<'a>(config: &Config,
         // the tags of 'source' and of its dependencies
         {
             let mut dep_tags_files = Vec::new();
-            for source in &direct_dep_sources {
+            for source in &children_sources {
                 dep_tags_files.push(source.cached_tags_file.as_path());
             }
 
