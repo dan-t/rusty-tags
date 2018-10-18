@@ -38,7 +38,8 @@ impl DepTree {
 /// Split the whole trees by their depth, starting with the highest depth,
 /// Each unique 'DepTree' is returned once with its highest depth. Only
 /// 'DepTree' are considered for which 'predicate' returns true.
-pub fn split_by_depth<'a, P>(roots: &'a Vec<Arc<DepTree>>,
+pub fn split_by_depth<'a, P>(config: &Config,
+                             roots: &'a Vec<Arc<DepTree>>,
                              predicate: P)
                              -> SplitByDepth<'a>
     where P: Fn(&DepTree) -> bool
@@ -63,6 +64,13 @@ pub fn split_by_depth<'a, P>(roots: &'a Vec<Arc<DepTree>>,
 
     // sort sources by higher depth
     dep_trees.sort_unstable_by(|a, b| b.depth.cmp(&a.depth));
+
+    if config.verbose {
+        println!("Source update order:");
+        for DepthWithTree { depth, tree } in &dep_trees {
+            println!("  {} '{}'", depth, tree.source.name);
+        }
+    }
 
     return SplitByDepth::new(dep_trees);
 

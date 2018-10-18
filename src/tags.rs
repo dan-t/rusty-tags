@@ -29,7 +29,7 @@ pub fn update_tags(config: &Config, roots: Vec<Arc<DepTree>>) -> RtResult<()> {
             dep_tree.source.needs_tags_update()
         };
 
-        split_by_depth(&roots, filter_dep_trees)
+        split_by_depth(config, &roots, filter_dep_trees)
     };
 
     let mut thread_pool = Pool::new(config.num_threads);
