@@ -1,8 +1,8 @@
 use std::path::Path;
-use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use serde_json;
+use fnv::{FnvHashMap, FnvHashSet};
 
 use rt_result::RtResult;
 use types::{DepTree, Source, SourceKind};
@@ -27,7 +27,7 @@ pub fn project_roots(config: &Config, metadata: &serde_json::Value) -> RtResult<
     };
 
     let mut dep_trees = Vec::new();
-    let mut dep_tree_cache: HashMap<&SourceName, Arc<DepTree>> = HashMap::new();
+    let mut dep_tree_cache = FnvHashMap::<&SourceName, Arc<DepTree>>::default();
     for name in &root_names {
         let mut dep_graph = DepGraph::new();
         if let Some(tree) = build_dep_tree(config, name, &get_kind, packages,
@@ -41,14 +41,14 @@ pub fn project_roots(config: &Config, metadata: &serde_json::Value) -> RtResult<
 
 struct DepGraph<'a> {
     dep_graph: Vec<&'a str>,
-    sorted_deps: HashSet<&'a str>
+    sorted_deps: FnvHashSet<&'a str>
 }
 
 impl<'a> DepGraph<'a> {
     pub fn new() -> DepGraph<'a> {
         DepGraph {
             dep_graph: Vec::new(),
-            sorted_deps: HashSet::new()
+            sorted_deps: FnvHashSet::default()
         }
     }
 
@@ -77,7 +77,7 @@ fn build_dep_tree<'a, F>(config: &Config,
                          get_kind: &F,
                          packages: &'a Vec<serde_json::Value>,
                          dep_graph: &mut DepGraph<'a>,
-                         dep_tree_cache: &mut HashMap<&'a SourceName, Arc<DepTree>>,
+                         dep_tree_cache: &mut FnvHashMap<&'a SourceName, Arc<DepTree>>,
                          level: u32)
                          -> RtResult<Option<Arc<DepTree>>>
     where F: Fn(&str) -> SourceKind
@@ -130,12 +130,12 @@ fn build_dep_tree<'a, F>(config: &Config,
     Ok(opt_dep_tree)
 }
 
-fn root_names(metadata: &serde_json::Value) -> RtResult<HashSet<&str>> {
+fn root_names(metadata: &serde_json::Value) -> RtResult<FnvHashSet<&str>> {
     let members = metadata.get("workspace_members")
         .and_then(serde_json::Value::as_array)
         .ok_or(format!("Couldn't find array entry 'workspace_members' in metadata:\n{}", to_string_pretty(metadata)))?;
 
-    let mut names = HashSet::new();
+    let mut names = FnvHashSet::default();
     for member in members {
         let member_str = member.as_str()
             .ok_or(format!("Expected 'workspace_members' of type string but found: {}", to_string_pretty(member)))?;

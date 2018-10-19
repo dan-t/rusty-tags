@@ -1,11 +1,11 @@
 use std::path::{Path, PathBuf};
 use std::fs::{self, File};
 use std::hash::{Hash, Hasher};
-use std::collections::hash_map::DefaultHasher;
 use std::process::Command;
 use std::cmp::Ordering;
 use std::ops::Drop;
 use std::sync::Arc;
+use fnv::{FnvHasher, FnvHashMap};
 
 use streaming_iterator::StreamingIterator;
 use rt_result::RtResult;
@@ -44,9 +44,14 @@ pub fn split_by_depth<'a, P>(config: &Config,
                              -> SplitByDepth<'a>
     where P: Fn(&DepTree) -> bool
 {
-    let mut dep_trees = Vec::with_capacity(10000);
+    let mut dep_trees = Vec::with_capacity(100_000);
+
+    type Depth = usize;
+    type SourceHash = str;
+    let mut max_depth = FnvHashMap::<&SourceHash, Depth>::default();
+
     for root in roots {
-        collect(root, 0, &predicate, &mut dep_trees);
+        collect(root, 0, &predicate, &mut max_depth, &mut dep_trees);
     }
 
     // sort first by source and then by higher depth
@@ -66,6 +71,7 @@ pub fn split_by_depth<'a, P>(config: &Config,
     dep_trees.sort_unstable_by(|a, b| b.depth.cmp(&a.depth));
 
     if config.verbose {
+        println!("Num sources: {}", dep_trees.len());
         println!("Source update order:");
         for DepthWithTree { depth, tree } in &dep_trees {
             println!("  {} '{}'", depth, tree.source.name);
@@ -77,6 +83,7 @@ pub fn split_by_depth<'a, P>(config: &Config,
     fn collect<'a, P>(dep_tree: &'a DepTree,
                       depth: usize,
                       predicate: &P,
+                      max_depth: &mut FnvHashMap<&'a SourceHash, Depth>,
                       dep_trees: &mut Vec<DepthWithTree<'a>>)
         where P: Fn(&DepTree) -> bool
     {
@@ -84,10 +91,19 @@ pub fn split_by_depth<'a, P>(config: &Config,
             return;
         }
 
+        {
+            let max_depth_entry = max_depth.entry(&dep_tree.source.hash).or_insert(0);
+            if *max_depth_entry > depth {
+                return;
+            } else {
+                *max_depth_entry = depth;
+            }
+        }
+
         dep_trees.push(DepthWithTree { depth, tree: dep_tree });
 
         for dep in &dep_tree.dependencies {
-            collect(dep, depth + 1, predicate, dep_trees);
+            collect(dep, depth + 1, predicate, max_depth, dep_trees);
         }
     }
 }
@@ -369,7 +385,7 @@ impl TagsSpec {
 }
 
 fn hash(path: &Path) -> String {
-    let mut hasher = DefaultHasher::new();
+    let mut hasher = FnvHasher::default();
     path.hash(&mut hasher);
     hasher.finish().to_string()
 }

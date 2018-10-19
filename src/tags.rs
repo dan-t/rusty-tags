@@ -1,12 +1,12 @@
 use std::fs::{File, OpenOptions, copy, rename};
-use std::io::{Read, Write};
-use std::collections::HashSet;
+use std::io::{Read, Write, BufWriter};
 use std::path::Path;
 use std::sync::Arc;
 
 use tempfile::NamedTempFile;
 use scoped_threadpool::Pool;
 use streaming_iterator::StreamingIterator;
+use fnv::FnvHashSet;
 
 use rt_result::RtResult;
 use types::{TagsKind, Source, DepTree, DepthWithTree, split_by_depth};
@@ -67,7 +67,7 @@ pub fn update_tags(config: &Config, roots: Vec<Arc<DepTree>>) -> RtResult<()> {
         {
             let cached_tags_file = &dep_tree.source.cached_tags_file;
             let reexp_sources = reexported_sources(config, &dep_tree.source, &children_sources)?;
-            let mut reexp_tags_files = Vec::new();
+            let mut reexp_tags_files = Vec::with_capacity(1000);
             for source in &reexp_sources {
                 reexp_tags_files.push(source.cached_tags_file.as_path());
             }
@@ -85,7 +85,7 @@ pub fn update_tags(config: &Config, roots: Vec<Arc<DepTree>>) -> RtResult<()> {
         // create the source tags file of 'dep_tree.source' by merging
         // the tags of 'source' and of its dependencies
         {
-            let mut dep_tags_files = Vec::new();
+            let mut dep_tags_files = Vec::with_capacity(1000);
             for source in &children_sources {
                 dep_tags_files.push(source.cached_tags_file.as_path());
             }
@@ -180,7 +180,7 @@ fn reexported_sources<'a>(config: &Config,
         println!("");
     }
 
-    let mut reexp_deps = Vec::new();
+    let mut reexp_deps = Vec::with_capacity(1000);
     for rcrate in reexp_crates {
         if let Some(crate_dep) = dep_sources.iter().find(|d| d.name == *rcrate) {
             reexp_deps.push(*crate_dep);
@@ -208,7 +208,7 @@ fn merge_tags(config: &Config,
 
     match config.tags_spec.kind {
         TagsKind::Vi => {
-            let mut file_contents: Vec<String> = Vec::new();
+            let mut file_contents: Vec<String> = Vec::with_capacity(1000);
 
             {
                 let mut file = File::open(lib_tag_file)?;
@@ -235,21 +235,25 @@ fn merge_tags(config: &Config,
                 }
             }
 
-            merged_lines.sort();
+            verbose!(config, "Num merged lines: {}", merged_lines.len());
+
+            merged_lines.sort_unstable();
             merged_lines.dedup();
 
-            let mut tag_file = OpenOptions::new()
+            let mut tag_file = BufWriter::with_capacity(64000, OpenOptions::new()
                 .create(true)
                 .truncate(true)
                 .read(true)
                 .write(true)
-                .open(into_tag_file)?;
+                .open(into_tag_file)?);
 
             tag_file.write_fmt(format_args!("{}\n", "!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;\" to lines/"))?;
             tag_file.write_fmt(format_args!("{}\n", "!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/"))?;
 
-            for line in merged_lines.iter() {
-                tag_file.write_fmt(format_args!("{}\n", *line))?;
+            let new_line = "\n".as_bytes();
+            for line in merged_lines {
+                tag_file.write(line.as_bytes())?;
+                tag_file.write(new_line)?;
             }
         },
 
@@ -258,12 +262,12 @@ fn merge_tags(config: &Config,
                 copy_tags(config, lib_tag_file, into_tag_file)?;
             }
 
-            let mut tag_file = OpenOptions::new()
+            let mut tag_file = BufWriter::with_capacity(64000, OpenOptions::new()
                 .create(true)
                 .append(true)
                 .read(true)
                 .write(true)
-                .open(into_tag_file)?;
+                .open(into_tag_file)?);
 
             for file in dependency_tag_files {
                 if *file != into_tag_file {
@@ -296,7 +300,7 @@ fn find_reexported_crates(src_dir: &Path) -> RtResult<Vec<CrateName>> {
     let lines = contents.lines();
 
     type ModuleName = String;
-    let mut pub_uses = HashSet::<ModuleName>::new();
+    let mut pub_uses = FnvHashSet::<ModuleName>::default();
 
     #[derive(Eq, PartialEq, Hash)]
     struct ExternCrate<'a>
@@ -305,7 +309,7 @@ fn find_reexported_crates(src_dir: &Path) -> RtResult<Vec<CrateName>> {
         as_name: &'a str
     }
 
-    let mut extern_crates = HashSet::<ExternCrate>::new();
+    let mut extern_crates = FnvHashSet::<ExternCrate>::default();
 
     for line in lines {
         let items = line.trim_matches(';').split(' ').collect::<Vec<&str>>();
