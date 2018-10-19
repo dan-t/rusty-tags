@@ -21,11 +21,6 @@ pub struct DepTree {
     pub dependencies: Vec<Arc<DepTree>>
 }
 
-pub struct DepthWithTree<'a> {
-    pub depth: usize,
-    pub tree: &'a DepTree
-}
-
 impl DepTree {
     /// The sources of the children of the 'DepTree'.
     pub fn children_sources(&self) -> Vec<&Source> {
@@ -33,6 +28,12 @@ impl DepTree {
             .map(|d| &d.source)
             .collect()
     }
+}
+
+/// A tree with its depth in the dependency hierarchy.
+pub struct DepthWithTree<'a> {
+    pub depth: usize,
+    pub tree: &'a DepTree
 }
 
 /// Split the whole trees by their depth, starting with the highest depth,
