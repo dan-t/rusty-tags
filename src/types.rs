@@ -228,10 +228,11 @@ impl Source {
     pub fn new(kind: SourceKind, name: &str, dir: &Path, tags_spec: &TagsSpec) -> RtResult<Source> {
         let cargo_toml_dir = find_dir_upwards_containing("Cargo.toml", dir)?;
         let tags_file = cargo_toml_dir.join(tags_spec.file_name());
-        let hash = format!("{}-{}.{}", name, hash(dir), tags_spec.file_extension());
+        let hash = hash(dir);
         let cached_tags_file = {
             let cache_dir = rusty_tags_cache_dir()?;
-            cache_dir.join(&hash)
+            let file_name = format!("{}-{}.{}", name, hash, tags_spec.file_extension());
+            cache_dir.join(&file_name)
         };
 
         Ok(Source {
