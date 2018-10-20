@@ -1,153 +1,119 @@
 use std::path::Path;
-use std::sync::Arc;
 
 use serde_json;
-use fnv::{FnvHashMap, FnvHashSet};
+use fnv::FnvHashMap;
+use semver::{Version, VersionReq};
 
 use rt_result::RtResult;
-use types::{DepTree, Source, SourceKind};
+use types::{DepTree, Source, SourceReq, SourceId};
 use config::Config;
 
 type SourceName = str;
+type SourceMap<'a> = FnvHashMap<&'a SourceName, Vec<(Version, SourceId)>>;
 
-/// Returns the root dependency trees of the cargo project. In the
-/// case of a cargo workspace there're multiple roots, for each
-/// workspace member one.
-pub fn project_roots(config: &Config, metadata: &serde_json::Value) -> RtResult<Vec<Arc<DepTree>>> {
+/// Returns the dependency tree of the whole cargo workspace.
+pub fn dependency_tree(config: &Config, metadata: &serde_json::Value) -> RtResult<DepTree> {
     let packages = packages(&metadata)?;
-    let root_names = root_names(&metadata)?;
-    verbose!(config, "Found workspace members: '{:?}'", root_names);
+    let workspace_members = workspace_members(&metadata)?;
+    verbose!(config, "Found workspace members: {:?}", workspace_members);
 
-    let get_kind = |src_name: &str| {
-        if root_names.contains(src_name) {
-            SourceKind::Root
-        } else {
-            SourceKind::Dep
-        }
-    };
-
-    let mut dep_trees = Vec::new();
-    let mut dep_tree_cache = FnvHashMap::<&SourceName, Arc<DepTree>>::default();
-    for name in &root_names {
-        let mut dep_graph = DepGraph::new();
-        if let Some(tree) = build_dep_tree(config, name, &get_kind, packages,
-                                           &mut dep_graph, &mut dep_tree_cache, 0)? {
-            dep_trees.push(tree);
+    let mut source_map = SourceMap::default();
+    let mut dep_tree = DepTree::new();
+    for member in &workspace_members {
+        if let Some(source_id) = build_dep_tree(config, member, 0, packages, &mut source_map, &mut dep_tree)? {
+            dep_tree.add_root(source_id);
         }
     }
 
-    Ok(dep_trees)
+    Ok(dep_tree)
 }
 
-struct DepGraph<'a> {
-    dep_graph: Vec<&'a str>,
-    sorted_deps: FnvHashSet<&'a str>
-}
-
-impl<'a> DepGraph<'a> {
-    pub fn new() -> DepGraph<'a> {
-        DepGraph {
-            dep_graph: Vec::new(),
-            sorted_deps: FnvHashSet::default()
-        }
-    }
-
-    pub fn push(&mut self, dep: &'a str) {
-        self.dep_graph.push(dep);
-        self.sorted_deps.insert(dep);
-    }
-
-    pub fn pop(&mut self) {
-        if let Some(dep) = self.dep_graph.pop() {
-            self.sorted_deps.remove(dep);
-        }
-    }
-
-    pub fn contains(&self, dep: &str) -> bool {
-        self.sorted_deps.contains(dep)
-    }
-
-    pub fn get(&self) -> &Vec<&'a str> {
-        &self.dep_graph
-    }
-}
-
-fn build_dep_tree<'a, F>(config: &Config,
-                         src_name: &'a str,
-                         get_kind: &F,
-                         packages: &'a Vec<serde_json::Value>,
-                         dep_graph: &mut DepGraph<'a>,
-                         dep_tree_cache: &mut FnvHashMap<&'a SourceName, Arc<DepTree>>,
-                         level: u32)
-                         -> RtResult<Option<Arc<DepTree>>>
-    where F: Fn(&str) -> SourceKind
+fn build_dep_tree<'a>(config: &Config,
+                      source_req: &SourceReq<'a>,
+                      level: usize,
+                      packages: &'a Vec<serde_json::Value>,
+                      source_map: &mut SourceMap<'a>,
+                      dep_tree: &mut DepTree)
+                      -> RtResult<Option<SourceId>>
 {
-    if dep_graph.contains(src_name) {
-        verbose!(config, "\n[{}] Found cyclic dependency on source '{}' in dependency graph:\n{:?}\n",
-                 level, src_name, dep_graph.get());
+    if let Some(sources) = source_map.get(source_req.name) {
+        for (version, source_id) in sources {
+            if source_req.req.matches(version) {
+                verbose!(config, "[{}] Reusing cached tree of {} for req {}", level, display(&source_req.name, &version), source_req.req);
+                return Ok(Some(*source_id));
+            }
+        }
+    }
+
+    let package = find_package(source_req, packages)?;
+    if package == None {
         return Ok(None);
     }
+    let package = package.unwrap();
 
-    if let Some(dep_tree) = dep_tree_cache.get(src_name) {
-        verbose!(config, "[{}] Reusing cached tree for source {:?}='{}'", level, dep_tree.source.kind, src_name);
-        return Ok(Some(dep_tree.clone()));
+    let version = version(package)?;
+    verbose!(config, "[{}] Found package for {}", level, display(&source_req.name, &version));
+
+    let is_root = level == 0;
+    let source_path = source_path(config, package, is_root)?;
+    if source_path == None {
+        return Ok(None);
+    }
+    let source_path = source_path.unwrap();
+
+    let source_id = dep_tree.new_source_id();
+    {
+        let sources = source_map.entry(source_req.name).or_insert(Vec::with_capacity(10));
+        sources.push((version.clone(), source_id));
     }
 
-    dep_graph.push(src_name);
+    let mut dep_source_ids = Vec::new();
+    if ! config.omit_deps {
+        let deps = dependencies(package)?;
+        if ! deps.is_empty() {
+            dep_source_ids.reserve(deps.len());
+            verbose!(config, "[{}] Found dependencies of {}: {:?}", level, display(&source_req.name, &version), deps);
+        }
 
-    let mut opt_dep_tree = None;
-    if let Some(pkg) = find_package(src_name, packages) {
-        let kind = get_kind(src_name);
-        verbose!(config, "[{}] Found package of {:?}='{}'", level, kind, src_name);
-        if let Some(src_path) = src_path(config, pkg, kind)? {
-            let mut dep_trees = Vec::new();
-            if !config.omit_deps {
-                let dep_names = dependency_names(pkg)?;
-                if ! dep_names.is_empty() {
-                    verbose!(config, "[{}] Found dependencies of {:?}='{}': '{:?}'", level, kind, src_name, dep_names);
-                }
-
-                for name in &dep_names {
-                    if let Some(tree) = build_dep_tree(config, name, get_kind, packages,
-                                                       dep_graph, dep_tree_cache, level + 1)? {
-                        dep_trees.push(tree);
-                    }
-                }
+        for dep in &deps {
+            if let Some(source_id) = build_dep_tree(config, dep, level + 1, packages, source_map, dep_tree)? {
+                dep_source_ids.push(source_id);
             }
-
-            verbose!(config, "[{}] Building tree for source {:?}='{}'", level, kind, src_name);
-            let dep_tree = Arc::new(DepTree {
-                source: Source::new(kind, src_name, src_path, &config.tags_spec)?,
-                dependencies: dep_trees
-            });
-
-            dep_tree_cache.insert(src_name, dep_tree.clone());
-            opt_dep_tree = Some(dep_tree);
         }
     }
 
-    dep_graph.pop();
-    Ok(opt_dep_tree)
+    verbose!(config, "[{}] Building tree for {}", level, display(&source_req.name, &version));
+
+    let source = Source::new(source_id, source_req.name, source_path, is_root, &config.tags_spec)?;
+    dep_tree.add_source(source, dep_source_ids);
+    Ok(Some(source_id))
 }
 
-fn root_names(metadata: &serde_json::Value) -> RtResult<FnvHashSet<&str>> {
+fn workspace_members<'a>(metadata: &'a serde_json::Value) -> RtResult<Vec<SourceReq<'a>>> {
     let members = metadata.get("workspace_members")
         .and_then(serde_json::Value::as_array)
         .ok_or(format!("Couldn't find array entry 'workspace_members' in metadata:\n{}", to_string_pretty(metadata)))?;
 
-    let mut names = FnvHashSet::default();
+    let mut source_reqs = Vec::with_capacity(50);
     for member in members {
         let member_str = member.as_str()
             .ok_or(format!("Expected 'workspace_members' of type string but found: {}", to_string_pretty(member)))?;
 
-        let name = member_str.split(' ')
-            .nth(0)
-            .ok_or(format!("Couldn't extract 'workspace_members' name from string: '{}'", member_str))?;
+        let mut split = member_str.split(' ');
+        let name = split.next();
+        if name == None {
+            return Err(format!("Couldn't extract 'workspace_members' name from string: '{}'", member_str).into());
+        }
 
-        names.insert(name);
+        let version = split.next();
+        if version == None {
+            return Err(format!("Couldn't extract 'workspace_members' version from string: '{}'", member_str).into());
+        }
+
+        source_reqs.push(SourceReq::new(name.unwrap(), VersionReq::parse(version.unwrap())?));
     }
 
-    Ok(names)
+    Ok(source_reqs)
 }
 
 fn packages(metadata: &serde_json::Value) -> RtResult<&Vec<serde_json::Value>> {
@@ -156,36 +122,57 @@ fn packages(metadata: &serde_json::Value) -> RtResult<&Vec<serde_json::Value>> {
         .ok_or(format!("Couldn't find array entry 'packages' in metadata:\n{}", to_string_pretty(metadata)).into())
 }
 
-fn find_package<'a>(name: &str, packages: &'a Vec<serde_json::Value>) -> Option<&'a serde_json::Value> {
+fn find_package<'a>(source_req: &SourceReq<'a>, packages: &'a Vec<serde_json::Value>) -> RtResult<Option<&'a serde_json::Value>> {
     for package in packages {
-        if Some(name) == package.get("name").and_then(serde_json::Value::as_str) {
-            return Some(package);
+        let name = package.get("name")
+            .and_then(serde_json::Value::as_str)
+            .ok_or(format!("Couldn't find string entry 'name' in package:\n{}", to_string_pretty(package)))?;
+
+        let version = package.get("version")
+            .and_then(serde_json::Value::as_str)
+            .ok_or(format!("Couldn't find string entry 'version' in package:\n{}", to_string_pretty(package)))?;
+
+        let version = Version::parse(version)?;
+        if name == source_req.name && source_req.req.matches(&version) {
+            return Ok(Some(package));
         }
     }
 
-    None
+    Ok(None)
 }
 
-fn dependency_names(package: &serde_json::Value) -> RtResult<Vec<&str>> {
+fn version(package: &serde_json::Value) -> RtResult<Version> {
+    let version = package.get("version")
+        .and_then(serde_json::Value::as_str)
+        .ok_or(format!("Couldn't find string entry 'version' in package:\n{}", to_string_pretty(package)))?;
+
+    Ok(Version::parse(version)?)
+}
+
+fn dependencies<'a>(package: &'a serde_json::Value) -> RtResult<Vec<SourceReq<'a>>> {
     let deps = package.get("dependencies")
         .and_then(serde_json::Value::as_array)
         .ok_or(format!("Couldn't find array entry 'dependencies' in package:\n{}", to_string_pretty(package)))?;
 
-    let mut names = Vec::new();
+    let mut source_reqs = Vec::new();
     for dep in deps {
         let name = dep.get("name")
             .and_then(serde_json::Value::as_str)
             .ok_or(format!("Couldn't find string entry 'name' in dependency:\n{}", to_string_pretty(dep)))?;
 
-        names.push(name);
+        let req = dep.get("req")
+            .and_then(serde_json::Value::as_str)
+            .ok_or(format!("Couldn't find string entry 'req' in dependency:\n{}", to_string_pretty(dep)))?;
+        let req = VersionReq::parse(req)?;
+
+        source_reqs.push(SourceReq::new(name, req));
     }
 
-    names.sort();
-    names.dedup();
-    Ok(names)
+    source_reqs.sort_unstable();
+    Ok(source_reqs)
 }
 
-fn src_path<'a>(config: &Config, package: &'a serde_json::Value, source_kind: SourceKind) -> RtResult<Option<&'a Path>> {
+fn source_path<'a>(config: &Config, package: &'a serde_json::Value, is_root: bool) -> RtResult<Option<&'a Path>> {
     let targets = package.get("targets")
         .and_then(serde_json::Value::as_array)
         .ok_or(format!("Couldn't find array entry 'targets' in package:\n{}", to_string_pretty(package)))?;
@@ -209,19 +196,15 @@ fn src_path<'a>(config: &Config, package: &'a serde_json::Value, source_kind: So
             let kind_str = kind.as_str()
                 .ok_or(format!("Expected 'kind' of type string but found: {}", to_string_pretty(kind)))?;
 
-            match source_kind {
-                SourceKind::Root => {
-                    if kind_str != "bin" && ! kind_str.contains("lib") && kind_str != "proc-macro" {
-                        verbose!(config, "Unsupported target kind for root: {}", kind_str);
-                        continue;
-                    }
-                },
-
-                SourceKind::Dep => {
-                    if ! kind_str.contains("lib") {
-                        verbose!(config, "Unsupported target kind for dependency: {}", kind_str);
-                        continue;
-                    }
+            if is_root {
+                if kind_str != "bin" && ! kind_str.contains("lib") && kind_str != "proc-macro" {
+                    verbose!(config, "Unsupported target kind for root: {}", kind_str);
+                    continue;
+                }
+            } else {
+                if ! kind_str.contains("lib") {
+                    verbose!(config, "Unsupported target kind for dependency: {}", kind_str);
+                    continue;
                 }
             }
 
@@ -254,4 +237,8 @@ fn src_path<'a>(config: &Config, package: &'a serde_json::Value, source_kind: So
 
 fn to_string_pretty(value: &serde_json::Value) -> String {
     serde_json::to_string_pretty(value).unwrap_or(String::new())
+}
+
+fn display(name: &str, version: &Version) -> String {
+    format!("({}, {})", name, version)
 }

@@ -6,6 +6,7 @@ extern crate serde;
 extern crate serde_json;
 extern crate streaming_iterator;
 extern crate fnv;
+extern crate semver;
 
 #[macro_use]
 extern crate serde_derive;
@@ -24,7 +25,7 @@ use std::env;
 use tempfile::NamedTempFile;
 
 use rt_result::RtResult;
-use dependencies::project_roots;
+use dependencies::dependency_tree;
 use tags::{update_tags, create_tags, move_tags};
 use config::Config;
 use types::SourceLock;
@@ -56,25 +57,38 @@ fn update_all_tags(config: &Config) -> RtResult<()> {
     let metadata = fetch_source_and_metadata(&config)?;
     update_std_lib_tags(&config)?;
 
-    let roots = project_roots(&config, &metadata)?;
-    let mut unlocked_roots = Vec::new();
     let mut source_locks = Vec::new();
-    for root in roots {
-        match root.source.lock()? {
-            SourceLock::AlreadyLocked { ref path } => {
-                info!(config, "Already creating tags for '{}', if this isn't the case remove the lock file '{}'",
-                      root.source.name, path.display());
-                continue;
+    let dep_tree = {
+        let mut dep_tree = dependency_tree(&config, &metadata)?;
+        let unlocked_root_ids: Vec<_> = {
+            let mut unlocked_roots = Vec::new();
+            for source in dep_tree.roots() {
+                match source.lock(&config.tags_spec)? {
+                    SourceLock::AlreadyLocked { ref path } => {
+                        info!(config, "Already creating tags for '{}', if this isn't the case remove the lock file '{}'",
+                              source.name, path.display());
+                        continue;
+                    }
+
+                    sl@SourceLock::Locked { .. } => {
+                        source_locks.push(sl);
+                        unlocked_roots.push(source);
+                    }
+                }
             }
 
-            sl@SourceLock::Locked { .. } => {
-                source_locks.push(sl);
-                unlocked_roots.push(root);
-            }
+            unlocked_roots.iter().map(|r| r.id).collect()
+        };
+
+        if unlocked_root_ids.is_empty() {
+            return Ok(());
         }
-    }
 
-    update_tags(&config, unlocked_roots)?;
+        dep_tree.set_roots(unlocked_root_ids);
+        dep_tree
+    };
+
+    update_tags(&config, &dep_tree)?;
     Ok(())
 }
 

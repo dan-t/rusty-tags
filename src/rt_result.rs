@@ -3,6 +3,7 @@ use std::convert::From;
 use std::fmt::{self, Display, Formatter};
 use toml;
 use serde_json;
+use semver::{ReqParseError, SemVerError};
 
 /// The result used in the whole application.
 pub type RtResult<T> = Result<T, RtErr>;
@@ -49,5 +50,19 @@ impl From<String> for RtErr {
 impl<'a> From<&'a str> for RtErr {
     fn from(s: &str) -> RtErr {
         RtErr::Message(s.to_owned())
+    }
+}
+
+impl From<ReqParseError> for RtErr {
+    fn from(_: ReqParseError) -> RtErr {
+        RtErr::Message("Invalid version requirement".to_owned())
+    }
+}
+
+impl From<SemVerError> for RtErr {
+    fn from(err: SemVerError) -> RtErr {
+        match err {
+            SemVerError::ParseError(err) => RtErr::Message(err)
+        }
     }
 }

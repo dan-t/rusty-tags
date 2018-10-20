@@ -1,7 +1,6 @@
 use std::fs::{File, OpenOptions, copy, rename};
 use std::io::{Read, Write, BufWriter};
 use std::path::Path;
-use std::sync::Arc;
 
 use tempfile::NamedTempFile;
 use scoped_threadpool::Pool;
@@ -9,42 +8,38 @@ use streaming_iterator::StreamingIterator;
 use fnv::FnvHashSet;
 
 use rt_result::RtResult;
-use types::{TagsKind, Source, DepTree, DepthWithTree, split_by_depth};
+use types::{TagsKind, Source, Sources, DepTree, SourceWithDepth};
 use config::Config;
 use dirs::rusty_tags_cache_dir;
 
 /// Update the tags of all sources of 'roots'.
-pub fn update_tags(config: &Config, roots: Vec<Arc<DepTree>>) -> RtResult<()> {
+pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
     if ! config.quiet {
-        let names: Vec<_> = roots.iter().map(|dt| &dt.source.name).collect();
+        let names: Vec<_> = dep_tree.roots().map(|r| &r.name).collect();
         println!("Creating tags for: {:?} ...", names);
     }
 
-    let mut dep_trees = {
-        let filter_dep_trees = |dep_tree: &DepTree| {
-            if config.force_recreate {
-                return true;
-            }
-
-            dep_tree.source.needs_tags_update()
-        };
-
-        split_by_depth(config, &roots, filter_dep_trees)
-    };
-
     let mut thread_pool = Pool::new(config.num_threads);
-    while let Some(trees) = dep_trees.next() {
+    let mut sources_by_depth = dep_tree.split_by_depth();
+    while let Some(sources) = sources_by_depth.next() {
+        let sources_to_update = sources.iter()
+            .filter(|swd| config.force_recreate || swd.source.needs_tags_update());
+
         if config.verbose {
-            println!("Sources of depth={}", trees[0].depth);
-            for DepthWithTree { tree, .. } in trees {
-                tree.source.print_recreate_status(config);
+            let tmp_sources: Vec<_> = sources_to_update.clone().collect();
+            if ! tmp_sources.is_empty() {
+                println!("Sources of depth={}", tmp_sources[0].depth);
+                for SourceWithDepth { source, .. } in tmp_sources {
+                    source.print_recreate_status(config);
+                }
             }
         }
 
         thread_pool.scoped(|scoped| {
-            for DepthWithTree { tree, .. } in trees {
+            for SourceWithDepth { source, .. } in sources_to_update {
                 scoped.execute(move || {
-                    update_tags_internal(config, tree).unwrap();
+                    let deps = dep_tree.dependencies(source);
+                    update_tags_internal(config, source, deps).unwrap();
                 });
             }
         });
@@ -52,52 +47,57 @@ pub fn update_tags(config: &Config, roots: Vec<Arc<DepTree>>) -> RtResult<()> {
 
     return Ok(());
 
-    fn update_tags_internal(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
-        // create a separate temporary file for every tags file
-        // and don't share any temporary directories
-
+    fn update_tags_internal<'a>(config: &Config, source: &'a Source, dependencies: Sources<'a>) -> RtResult<()> {
+        // create tags for 'source'
         let tmp_src_tags = NamedTempFile::new()?;
-        create_tags(config, &[&dep_tree.source.dir], tmp_src_tags.path())?;
+        create_tags(config, &[&source.dir], tmp_src_tags.path())?;
 
-        let children_sources = dep_tree.children_sources();
-
-        // create the cached tags file of 'dep_tree.source' which
+        // create the cached tags file of 'source' which
         // might also contain the tags of dependencies if they're
         // reexported
         {
-            let cached_tags_file = &dep_tree.source.cached_tags_file;
-            let reexp_sources = reexported_sources(config, &dep_tree.source, &children_sources)?;
-            let mut reexp_tags_files = Vec::with_capacity(1000);
-            for source in &reexp_sources {
-                reexp_tags_files.push(source.cached_tags_file.as_path());
+            let reexported_crates = find_reexported_crates(&source.dir)?;
+
+            if ! reexported_crates.is_empty() && config.verbose {
+                println!("\nFound public reexports in '{}' of:", source.name);
+                for rcrate in &reexported_crates {
+                    println!("   {}", rcrate);
+                }
+
+                println!("");
             }
 
+            // collect the tags files of reexported dependencies
+            let reexported_tags_files: Vec<&Path> = dependencies.clone()
+                .filter(|d| reexported_crates.iter().find(|c| **c == d.name) != None)
+                .map(|d| d.cached_tags_file.as_path())
+                .collect();
+
             let tmp_cached_tags = NamedTempFile::new_in(rusty_tags_cache_dir()?)?;
-            if ! reexp_tags_files.is_empty() {
-                merge_tags(config, tmp_src_tags.path(), &reexp_tags_files, tmp_cached_tags.path())?;
+            if ! reexported_tags_files.is_empty() {
+                merge_tags(config, tmp_src_tags.path(), &reexported_tags_files, tmp_cached_tags.path())?;
             } else {
                 copy_tags(config, tmp_src_tags.path(), tmp_cached_tags.path())?;
             }
 
-            move_tags(config, tmp_cached_tags.path(), &cached_tags_file)?;
+            move_tags(config, tmp_cached_tags.path(), &source.cached_tags_file)?;
         }
 
-        // create the source tags file of 'dep_tree.source' by merging
+        // create the source tags file of 'source' by merging
         // the tags of 'source' and of its dependencies
         {
-            let mut dep_tags_files = Vec::with_capacity(1000);
-            for source in &children_sources {
-                dep_tags_files.push(source.cached_tags_file.as_path());
-            }
+            let dep_tags_files: Vec<&Path> = dependencies.clone()
+                .map(|d| d.cached_tags_file.as_path())
+                .collect();
 
-            let tmp_src_and_dep_tags = NamedTempFile::new_in(&dep_tree.source.dir)?;
+            let tmp_src_and_dep_tags = NamedTempFile::new_in(&source.dir)?;
             if ! dep_tags_files.is_empty() {
                 merge_tags(config, tmp_src_tags.path(), &dep_tags_files, tmp_src_and_dep_tags.path())?;
             } else {
                 copy_tags(config, tmp_src_tags.path(), tmp_src_and_dep_tags.path())?;
             }
 
-            move_tags(config, tmp_src_and_dep_tags.path(), &dep_tree.source.tags_file)?;
+            move_tags(config, tmp_src_and_dep_tags.path(), &source.tags_file)?;
         }
 
         Ok(())
@@ -160,34 +160,6 @@ pub fn move_tags(config: &Config, from_tags: &Path, to_tags: &Path) -> RtResult<
 
     let _ = rename(from_tags, to_tags)?;
     Ok(())
-}
-
-fn reexported_sources<'a>(config: &Config,
-                          source: &Source,
-                          dep_sources: &[&'a Source])
-                          -> RtResult<Vec<&'a Source>> {
-    let reexp_crates = find_reexported_crates(&source.dir)?;
-    if reexp_crates.is_empty() {
-        return Ok(Vec::new());
-    }
-
-    if config.verbose {
-        println!("\nFound public reexports in '{}' of:", source.name);
-        for rcrate in &reexp_crates {
-            println!("   {}", rcrate);
-        }
-
-        println!("");
-    }
-
-    let mut reexp_deps = Vec::with_capacity(1000);
-    for rcrate in reexp_crates {
-        if let Some(crate_dep) = dep_sources.iter().find(|d| d.name == *rcrate) {
-            reexp_deps.push(*crate_dep);
-        }
-    }
-
-    Ok(reexp_deps)
 }
 
 /// merges the library tag file `lib_tag_file` and its dependency tag files

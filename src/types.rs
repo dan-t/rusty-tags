@@ -4,96 +4,110 @@ use std::hash::{Hash, Hasher};
 use std::process::Command;
 use std::cmp::Ordering;
 use std::ops::Drop;
-use std::sync::Arc;
-use fnv::{FnvHasher, FnvHashMap};
+use std::fmt;
 
+use fnv::{FnvHasher, FnvHashMap};
+use semver::VersionReq;
 use streaming_iterator::StreamingIterator;
 use rt_result::RtResult;
 use dirs::{rusty_tags_cache_dir, rusty_tags_locks_dir};
 use config::Config;
 
+pub type SourceId = usize;
+type Depth = usize;
+
+type SourceMap = FnvHashMap<SourceId, Source>;
+type DepMap = FnvHashMap<SourceId, Vec<SourceId>>;
+
 /// The tree describing the dependencies of the whole cargo project.
-/// In the case of a cargo workspace, there's a separate 'DepTree'
-/// for every member of the workspace.
 #[derive(Debug)]
 pub struct DepTree {
-    pub source: Source,
-    pub dependencies: Vec<Arc<DepTree>>
+    roots: Vec<SourceId>,
+    sources: SourceMap,
+    dependencies: DepMap,
+    num_source_ids: usize
 }
 
 impl DepTree {
-    /// The sources of the children of the 'DepTree'.
-    pub fn children_sources(&self) -> Vec<&Source> {
-        self.dependencies.iter()
-            .map(|d| &d.source)
-            .collect()
-    }
-}
-
-/// A tree with its depth in the dependency hierarchy.
-pub struct DepthWithTree<'a> {
-    pub depth: usize,
-    pub tree: &'a DepTree
-}
-
-/// Split the whole trees by their depth, starting with the highest depth,
-/// Each unique 'DepTree' is returned once with its highest depth. Only
-/// 'DepTree' are considered for which 'predicate' returns true.
-pub fn split_by_depth<'a, P>(config: &Config,
-                             roots: &'a Vec<Arc<DepTree>>,
-                             predicate: P)
-                             -> SplitByDepth<'a>
-    where P: Fn(&DepTree) -> bool
-{
-    let mut dep_trees = Vec::with_capacity(100_000);
-
-    type Depth = usize;
-    type SourceHash = str;
-    let mut max_depth = FnvHashMap::<&SourceHash, Depth>::default();
-
-    for root in roots {
-        collect(root, 0, &predicate, &mut max_depth, &mut dep_trees);
-    }
-
-    // sort first by source and then by higher depth
-    dep_trees.sort_unstable_by(|a, b| {
-        let ord = a.tree.source.hash.cmp(&b.tree.source.hash);
-        if ord != Ordering::Equal {
-            return ord;
-        }
-
-        b.depth.cmp(&a.depth)
-    });
-
-    // dedup to source with highest depth
-    dep_trees.dedup_by_key(|i| &i.tree.source.hash);
-
-    // sort sources by higher depth
-    dep_trees.sort_unstable_by(|a, b| b.depth.cmp(&a.depth));
-
-    if config.verbose {
-        println!("Num sources: {}", dep_trees.len());
-        println!("Source update order:");
-        for DepthWithTree { depth, tree } in &dep_trees {
-            println!("  {} '{}'", depth, tree.source.name);
+    pub fn new() -> DepTree {
+        DepTree {
+            roots: Vec::with_capacity(10),
+            sources: SourceMap::default(),
+            dependencies: DepMap::default(),
+            num_source_ids: 0
         }
     }
 
-    return SplitByDepth::new(dep_trees);
+    pub fn roots(&self) -> Sources {
+        Sources::new(&self.sources, Some(&self.roots))
+    }
 
-    fn collect<'a, P>(dep_tree: &'a DepTree,
-                      depth: usize,
-                      predicate: &P,
-                      max_depth: &mut FnvHashMap<&'a SourceHash, Depth>,
-                      dep_trees: &mut Vec<DepthWithTree<'a>>)
-        where P: Fn(&DepTree) -> bool
-    {
-        if ! predicate(dep_tree) {
-            return;
+    pub fn dependencies(&self, source: &Source) -> Sources {
+        Sources::new(&self.sources, self.dependencies.get(&source.id))
+    }
+
+    /// Split the whole tree by his depth, starting with the highest depth,
+    /// Each unique 'SourceId' is returned once with its highest depth. Only
+    /// 'SourceId' are considered for which 'predicate' returns true.
+    pub fn split_by_depth(&self) -> SplitByDepth {
+        type Depth = usize;
+        let mut dep_graph = Vec::with_capacity(100);
+        let mut max_depth = FnvHashMap::<SourceId, Depth>::default();
+        let mut sources = Vec::with_capacity(100_000);
+        for root in self.roots() {
+            self.collect(root, 0, &mut dep_graph, &mut max_depth, &mut sources);
         }
+
+        // sort first by source id and then by higher depth
+        sources.sort_unstable_by(|a, b| {
+            let ord = a.source.id.cmp(&b.source.id);
+            if ord != Ordering::Equal {
+                return ord;
+            }
+
+            b.depth.cmp(&a.depth)
+        });
+
+        // dedup to sources with highest depth
+        sources.dedup_by_key(|i| &i.source.id);
+
+        // sort sources by higher depth
+        sources.sort_unstable_by(|a, b| b.depth.cmp(&a.depth));
+
+        SplitByDepth::new(sources)
+    }
+
+    pub fn new_source_id(&mut self) -> SourceId {
+        let id = self.num_source_ids;
+        self.num_source_ids += 1;
+        id
+    }
+
+    pub fn add_root(&mut self, id: SourceId) {
+        self.roots.push(id);
+    }
+
+    pub fn set_roots(&mut self, ids: Vec<SourceId>) {
+        self.roots = ids;
+    }
+
+    pub fn add_source(&mut self, src: Source, dependencies: Vec<SourceId>) {
+        let id = src.id;
+        self.sources.insert(src.id, src);
+        if ! dependencies.is_empty() {
+            self.dependencies.insert(id, dependencies);
+        }
+    }
+
+    fn collect<'a>(&'a self, source: &'a Source, depth: usize,
+                   dep_graph: &mut Vec<SourceId>,
+                   max_depth: &mut FnvHashMap<SourceId, Depth>,
+                   sources: &mut Vec<SourceWithDepth<'a>>) {
 
         {
-            let max_depth_entry = max_depth.entry(&dep_tree.source.hash).or_insert(0);
+            let max_depth_entry = max_depth.entry(source.id).or_insert(0);
+
+            // the source was already found deeper in the dependency hierarchy
             if *max_depth_entry > depth {
                 return;
             } else {
@@ -101,17 +115,62 @@ pub fn split_by_depth<'a, P>(config: &Config,
             }
         }
 
-        dep_trees.push(DepthWithTree { depth, tree: dep_tree });
-
-        for dep in &dep_tree.dependencies {
-            collect(dep, depth + 1, predicate, max_depth, dep_trees);
+        // cyclic dependency detected
+        if let Some(_) = dep_graph.iter().find(|d| **d == source.id) {
+            return;
         }
+
+        sources.push(SourceWithDepth { source, depth });
+        dep_graph.push(source.id);
+
+        for dep in self.dependencies(source) {
+            self.collect(dep, depth + 1, dep_graph, max_depth, sources);
+        }
+
+        dep_graph.pop();
     }
 }
 
-/// Split the 'dep_trees' in continous regions of the same depth.
+#[derive(Clone)]
+pub struct Sources<'a> {
+    sources: &'a SourceMap,
+    source_ids: Option<&'a Vec<SourceId>>,
+    idx: usize
+}
+
+impl<'a> Sources<'a> {
+    fn new(sources: &'a SourceMap, source_ids: Option<&'a Vec<SourceId>>) -> Sources<'a> {
+        Sources { sources, source_ids, idx: 0 }
+    }
+}
+
+impl<'a> Iterator for Sources<'a> {
+    type Item = &'a Source;
+
+     fn next(&mut self) -> Option<Self::Item> {
+         if let Some(source_ids) = self.source_ids {
+             if self.idx >= source_ids.len() {
+                 None
+             } else {
+                 let id = source_ids[self.idx];
+                 let src = self.sources.get(&id);
+                 self.idx += 1;
+                 src
+             }
+         } else {
+             None
+         }
+     }
+}
+
+pub struct SourceWithDepth<'a> {
+    pub source: &'a Source,
+    pub depth: usize,
+}
+
+/// Split the 'sources' in continous regions of the same depth.
 pub struct SplitByDepth<'a> {
-    dep_trees: Vec<DepthWithTree<'a>>,
+    sources: Vec<SourceWithDepth<'a>>,
 
     first_idx: usize,
     cur_depth: usize,
@@ -119,59 +178,48 @@ pub struct SplitByDepth<'a> {
 }
 
 impl<'a> SplitByDepth<'a> {
-    pub fn new(dep_trees: Vec<DepthWithTree<'a>>) -> SplitByDepth<'a> {
+    pub fn new(sources: Vec<SourceWithDepth<'a>>) -> SplitByDepth<'a> {
         SplitByDepth {
             first_idx: 0,
-            cur_depth: if dep_trees.is_empty() { 0 } else { dep_trees[0].depth },
+            cur_depth: if sources.is_empty() { 0 } else { sources[0].depth },
             cur_idx: 0,
-            dep_trees: dep_trees
+            sources: sources
         }
     }
 }
 
 impl<'a> StreamingIterator for SplitByDepth<'a> {
-    type Item = [DepthWithTree<'a>];
+    type Item = [SourceWithDepth<'a>];
 
     #[inline]
     fn advance(&mut self) {
-        if self.cur_idx > self.dep_trees.len() {
+        if self.cur_idx > self.sources.len() {
             return;
         }
 
         self.first_idx = self.cur_idx;
         self.cur_idx += 1;
 
-        self.cur_depth = if self.first_idx < self.dep_trees.len() {
-            self.dep_trees[self.first_idx].depth
+        self.cur_depth = if self.first_idx < self.sources.len() {
+            self.sources[self.first_idx].depth
         } else {
             0
         };
 
-        while self.cur_idx < self.dep_trees.len()
-                  && self.cur_depth == self.dep_trees[self.cur_idx].depth {
+        while self.cur_idx < self.sources.len()
+                  && self.cur_depth == self.sources[self.cur_idx].depth {
             self.cur_idx += 1;
         }
     }
 
     #[inline]
     fn get(&self) -> Option<&Self::Item> {
-        if self.cur_idx > self.dep_trees.len() {
+        if self.cur_idx > self.sources.len() {
             return None;
         }
 
-        Some(&self.dep_trees[self.first_idx .. self.cur_idx])
+        Some(&self.sources[self.first_idx .. self.cur_idx])
     }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SourceKind {
-    /// The source of the cargo project. In the case
-    /// of a cargo workspace, there's a 'Root' for
-    /// every member of the workspace.
-    Root,
-
-    /// The source of a dependency.
-    Dep
 }
 
 /// Lock a source to prevent that multiple running instances
@@ -188,8 +236,9 @@ pub enum SourceLock {
 }
 
 impl SourceLock {
-    fn new(source: &Source) -> RtResult<SourceLock> {
-        let lock_file = rusty_tags_locks_dir()?.join(&source.hash);
+    fn new(source: &Source, tags_spec: &TagsSpec) -> RtResult<SourceLock> {
+        let file_name = format!("{}-{}.{}", source.name, source.hash, tags_spec.file_extension());
+        let lock_file = rusty_tags_locks_dir()?.join(file_name);
         if lock_file.is_file() {
             Ok(SourceLock::AlreadyLocked { path: lock_file })
         } else {
@@ -217,19 +266,20 @@ impl Drop for SourceLock {
 
 #[derive(Clone, Debug)]
 pub struct Source {
-    pub kind: SourceKind,
+    pub id: SourceId,
     pub name: String,
     pub dir: PathBuf,
     pub hash: String,
+    pub is_root: bool,
     pub tags_file: PathBuf,
     pub cached_tags_file: PathBuf,
 }
 
 impl Source {
-    pub fn new(kind: SourceKind, name: &str, dir: &Path, tags_spec: &TagsSpec) -> RtResult<Source> {
+    pub fn new(id: SourceId, name: &str, dir: &Path, is_root: bool, tags_spec: &TagsSpec) -> RtResult<Source> {
         let cargo_toml_dir = find_dir_upwards_containing("Cargo.toml", dir)?;
         let tags_file = cargo_toml_dir.join(tags_spec.file_name());
-        let hash = hash(dir);
+        let hash = source_hash(dir);
         let cached_tags_file = {
             let cache_dir = rusty_tags_cache_dir()?;
             let file_name = format!("{}-{}.{}", name, hash, tags_spec.file_extension());
@@ -237,10 +287,11 @@ impl Source {
         };
 
         Ok(Source {
-            kind: kind,
+            id: id,
             name: name.to_owned(),
             dir: dir.to_owned(),
             hash: hash,
+            is_root: is_root,
             tags_file: tags_file,
             cached_tags_file: cached_tags_file
         })
@@ -251,7 +302,7 @@ impl Source {
         // because we don't know which source file has been changed and
         // even if we would know it, we couldn't easily just replace the
         // tags of the changed source file.
-        if self.kind == SourceKind::Root {
+        if self.is_root {
             return true;
         }
 
@@ -261,7 +312,7 @@ impl Source {
     pub fn print_recreate_status(&self, config: &Config) {
         if config.force_recreate {
             println!("Forced recreating of tags for '{}'", self.name);
-        } else if self.kind == SourceKind::Root {
+        } else if self.is_root {
             println!("Recreating tags for cargo project root '{}'", self.name);
         } else if ! self.cached_tags_file.is_file() {
             println!("Recreating tags for '{}', because of missing cache file at '{:?}'",
@@ -274,9 +325,39 @@ impl Source {
         }
     }
 
-    pub fn lock(&self) -> RtResult<SourceLock> {
-        SourceLock::new(self)
+    pub fn lock(&self, tags_spec: &TagsSpec) -> RtResult<SourceLock> {
+        SourceLock::new(self, tags_spec)
     }
+}
+
+#[derive(PartialEq, Eq, Clone, PartialOrd, Ord)]
+pub struct SourceReq<'a> {
+    pub name: &'a str,
+    pub req: VersionReq
+}
+
+impl<'a> SourceReq<'a> {
+    pub fn new(name: &'a str, req: VersionReq) -> SourceReq<'a> {
+        SourceReq { name, req }
+    }
+}
+
+impl<'a> fmt::Debug for SourceReq<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "({}, {})", self.name, self.req)
+    }
+}
+
+impl<'a> fmt::Display for SourceReq<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "({}, {})", self.name, self.req)
+    }
+}
+
+fn source_hash(source_dir: &Path) -> String {
+    let mut hasher = FnvHasher::default();
+    source_dir.hash(&mut hasher);
+    hasher.finish().to_string()
 }
 
 /// which kind of tags are created
@@ -384,12 +465,6 @@ impl TagsSpec {
             cmd.arg(&self.ctags_options);
         }
     }
-}
-
-fn hash(path: &Path) -> String {
-    let mut hasher = FnvHasher::default();
-    path.hash(&mut hasher);
-    hasher.finish().to_string()
 }
 
 fn find_dir_upwards_containing(file_name: &str, start_dir: &Path) -> RtResult<PathBuf> {
