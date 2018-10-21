@@ -47,6 +47,11 @@ fn build_dep_tree<'a>(config: &Config,
     let package = packages.get(source_version)
         .ok_or(format!("[{}] Couldn't find package of {}", depth, source_version))?;
 
+
+    // make source_map entry before recursing into children
+    // to handle cyclic dependencies
+    source_map.insert(source_version.clone(), package.source_id);
+
     let dep_source_ids = {
         if config.omit_deps {
             Vec::new()
@@ -70,7 +75,6 @@ fn build_dep_tree<'a>(config: &Config,
     let is_root = depth == 0;
     let source = Source::new(package.source_id, source_version.name, package.source_path, is_root, &config.tags_spec)?;
     dep_tree.set_source(source, dep_source_ids);
-    source_map.insert(source_version.clone(), package.source_id);
     Ok(Some(package.source_id))
 }
 
