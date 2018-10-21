@@ -13,7 +13,6 @@ use rt_result::RtResult;
 use dirs::{rusty_tags_cache_dir, rusty_tags_locks_dir};
 use config::Config;
 
-pub type SourceId = usize;
 type Depth = usize;
 
 type SourceMap = FnvHashMap<SourceId, Source>;
@@ -79,7 +78,7 @@ impl DepTree {
     pub fn new_source_id(&mut self) -> SourceId {
         let id = self.num_source_ids;
         self.num_source_ids += 1;
-        id
+        SourceId { id }
     }
 
     pub fn add_root(&mut self, id: SourceId) {
@@ -327,6 +326,11 @@ impl Source {
     pub fn lock(&self, tags_spec: &TagsSpec) -> RtResult<SourceLock> {
         SourceLock::new(self, tags_spec)
     }
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Debug)]
+pub struct SourceId {
+    id: usize
 }
 
 #[derive(PartialEq, Eq, Clone, PartialOrd, Ord)]
