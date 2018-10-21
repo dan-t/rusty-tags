@@ -61,7 +61,7 @@ fn build_dep_tree<'a>(config: &Config,
     }
     let source_path = source_path.unwrap();
 
-    let source_id = dep_tree.new_source_id();
+    let source_id = dep_tree.new_source();
     {
         let sources = source_map.entry(source_req.name).or_insert(Vec::with_capacity(10));
         sources.push((version.clone(), source_id));
@@ -85,7 +85,7 @@ fn build_dep_tree<'a>(config: &Config,
     verbose!(config, "[{}] Building tree for {}", level, display(&source_req.name, &version));
 
     let source = Source::new(source_id, source_req.name, source_path, is_root, &config.tags_spec)?;
-    dep_tree.add_source(source, dep_source_ids);
+    dep_tree.set_source(source, dep_source_ids);
     Ok(Some(source_id))
 }
 

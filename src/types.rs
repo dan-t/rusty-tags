@@ -3,7 +3,7 @@ use std::fs::{self, File};
 use std::hash::{Hash, Hasher};
 use std::process::Command;
 use std::cmp::Ordering;
-use std::ops::Drop;
+use std::ops::{Drop, Deref};
 use std::fmt;
 
 use fnv::{FnvHasher, FnvHashMap};
@@ -15,25 +15,20 @@ use config::Config;
 
 type Depth = usize;
 
-type SourceMap = FnvHashMap<SourceId, Source>;
-type DepMap = FnvHashMap<SourceId, Vec<SourceId>>;
-
 /// The tree describing the dependencies of the whole cargo project.
 #[derive(Debug)]
 pub struct DepTree {
     roots: Vec<SourceId>,
-    sources: SourceMap,
-    dependencies: DepMap,
-    num_source_ids: usize
+    sources: Vec<Option<Source>>,
+    dependencies: Vec<Option<Vec<SourceId>>>
 }
 
 impl DepTree {
     pub fn new() -> DepTree {
         DepTree {
             roots: Vec::with_capacity(10),
-            sources: SourceMap::default(),
-            dependencies: DepMap::default(),
-            num_source_ids: 0
+            sources: Vec::new(),
+            dependencies: Vec::new()
         }
     }
 
@@ -42,7 +37,7 @@ impl DepTree {
     }
 
     pub fn dependencies(&self, source: &Source) -> Sources {
-        Sources::new(&self.sources, self.dependencies.get(&source.id))
+        Sources::new(&self.sources, self.dependencies_slice(source))
     }
 
     /// Split the whole tree by its depth, starting with the biggest depth.
@@ -75,9 +70,10 @@ impl DepTree {
         SplitByDepth::new(sources)
     }
 
-    pub fn new_source_id(&mut self) -> SourceId {
-        let id = self.num_source_ids;
-        self.num_source_ids += 1;
+    pub fn new_source(&mut self) -> SourceId {
+        let id = self.sources.len();
+        self.sources.push(None);
+        self.dependencies.push(None);
         SourceId { id }
     }
 
@@ -89,12 +85,16 @@ impl DepTree {
         self.roots = ids;
     }
 
-    pub fn add_source(&mut self, src: Source, dependencies: Vec<SourceId>) {
-        let id = src.id;
-        self.sources.insert(src.id, src);
+    pub fn set_source(&mut self, src: Source, dependencies: Vec<SourceId>) {
+        let id = *src.id;
+        self.sources[id] = Some(src);
         if ! dependencies.is_empty() {
-            self.dependencies.insert(id, dependencies);
+            self.dependencies[id] = Some(dependencies);
         }
+    }
+
+    fn dependencies_slice(&self, source: &Source) -> Option<&[SourceId]> {
+        self.dependencies[*source.id].as_ref().map(Vec::as_slice)
     }
 
     fn collect<'a>(&'a self, source: &'a Source, depth: usize,
@@ -131,13 +131,13 @@ impl DepTree {
 
 #[derive(Clone)]
 pub struct Sources<'a> {
-    sources: &'a SourceMap,
-    source_ids: Option<&'a Vec<SourceId>>,
+    sources: &'a [Option<Source>],
+    source_ids: Option<&'a [SourceId]>,
     idx: usize
 }
 
 impl<'a> Sources<'a> {
-    fn new(sources: &'a SourceMap, source_ids: Option<&'a Vec<SourceId>>) -> Sources<'a> {
+    fn new(sources: &'a [Option<Source>], source_ids: Option<&'a [SourceId]>) -> Sources<'a> {
         Sources { sources, source_ids, idx: 0 }
     }
 }
@@ -151,7 +151,7 @@ impl<'a> Iterator for Sources<'a> {
                  None
              } else {
                  let id = source_ids[self.idx];
-                 let src = self.sources.get(&id);
+                 let src = self.sources[*id].as_ref();
                  self.idx += 1;
                  src
              }
@@ -331,6 +331,14 @@ impl Source {
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Debug)]
 pub struct SourceId {
     id: usize
+}
+
+impl Deref for SourceId {
+    type Target = usize;
+
+    fn deref(&self) -> &Self::Target {
+        &self.id
+    }
 }
 
 #[derive(PartialEq, Eq, Clone, PartialOrd, Ord)]
