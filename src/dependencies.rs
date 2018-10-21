@@ -174,7 +174,9 @@ fn resolved_nodes<'a>(config: &Config,
             dep_versions.push(SourceVersion::parse_from_id(id)?);
         }
 
-        verbose!(config, "Found dependencies of {}: {:?}", node_version, dep_versions);
+        if ! dep_versions.is_empty() {
+            verbose!(config, "Found dependencies of {}: {:?}", node_version, dep_versions);
+        }
 
         node_map.insert(node_id, dep_versions);
     }
