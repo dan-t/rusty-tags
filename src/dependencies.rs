@@ -8,9 +8,11 @@ use types::{DepTree, Source, SourceVersion, SourceId};
 use config::Config;
 
 type SourceMap<'a> = FnvHashMap<SourceVersion<'a>, SourceId>;
+type JsonValue = serde_json::Value;
+type JsonObject = serde_json::Map<String, JsonValue>;
 
 /// Returns the dependency tree of the whole cargo workspace.
-pub fn dependency_tree(config: &Config, metadata: &serde_json::Value) -> RtResult<DepTree> {
+pub fn dependency_tree(config: &Config, metadata: &JsonValue) -> RtResult<DepTree> {
     let workspace_members = workspace_members(metadata)?;
     verbose!(config, "Found workspace members: {:?}", workspace_members);
 
@@ -78,11 +80,8 @@ fn build_dep_tree<'a>(config: &Config,
     Ok(Some(package.source_id))
 }
 
-fn workspace_members(metadata: &serde_json::Value) -> RtResult<Vec<SourceVersion>> {
-    let members = metadata.get("workspace_members")
-        .and_then(serde_json::Value::as_array)
-        .ok_or(format!("Couldn't find array entry 'workspace_members' in metadata:\n{}", to_string_pretty(metadata)))?;
-
+fn workspace_members(metadata: &JsonValue) -> RtResult<Vec<SourceVersion>> {
+    let members = as_array_from_value("workspace_members", metadata)?;
     let mut source_versions = Vec::with_capacity(members.len());
     for member in members {
         let member_str = member.as_str()
@@ -102,20 +101,14 @@ struct Package<'a> {
 type Packages<'a> = FnvHashMap<SourceVersion<'a>, Package<'a>>;
 
 fn packages<'a>(config: &Config,
-                metadata: &'a serde_json::Value,
+                metadata: &'a JsonValue,
                 dep_tree: &mut DepTree)
                 -> RtResult<Packages<'a>> {
-    let packages = metadata.get("packages")
-        .and_then(serde_json::Value::as_array)
-        .ok_or(format!("Couldn't find array entry 'packages' in metadata:\n{}", to_string_pretty(metadata)))?;
-
+    let packages = as_array_from_value("packages", metadata)?;
     dep_tree.reserve_num_sources(packages.len());
     let mut package_map = FnvHashMap::default();
     for package in packages {
-        let id = package.get("id")
-            .and_then(serde_json::Value::as_str)
-            .ok_or(format!("Couldn't find string entry 'id' in package:\n{}", to_string_pretty(package)))?;
-
+        let id = as_str_from_value("id", package)?;
         let source_version = SourceVersion::parse_from_id(id)?;
 
         let source_path = {
@@ -139,24 +132,16 @@ fn packages<'a>(config: &Config,
 type ResolvedNodes<'a> = FnvHashMap<SourceId, Vec<SourceVersion<'a>>>;
 
 fn resolved_nodes<'a>(config: &Config,
-                      metadata: &'a serde_json::Value,
+                      metadata: &'a JsonValue,
                       packages: &Packages)
                       -> RtResult<ResolvedNodes<'a>> {
-    let resolve = metadata.get("resolve")
-        .and_then(serde_json::Value::as_object)
-        .ok_or(format!("Couldn't find object entry 'resolve' in metadata:\n{}", to_string_pretty(metadata)))?;
-
-    let nodes = resolve.get("nodes")
-        .and_then(serde_json::Value::as_array)
-        .ok_or(format!("Couldn't find array entry 'nodes' in resolve:\n{:?}", resolve))?;
+    let resolve = as_object_from_value("resolve", metadata)?;
+    let nodes = as_array_from_object("nodes", resolve)?;
 
     let mut node_map = ResolvedNodes::default();
     for node in nodes {
         let node_version = {
-            let id = node.get("id")
-                .and_then(serde_json::Value::as_str)
-                .ok_or(format!("Couldn't find string entry 'id' in node:\n{}", to_string_pretty(node)))?;
-
+            let id = as_str_from_value("id", node)?;
             SourceVersion::parse_from_id(id)?
         };
 
@@ -164,9 +149,7 @@ fn resolved_nodes<'a>(config: &Config,
             .map(|p| p.source_id)
             .ok_or(format!("Couldn't find package for {}", node_version))?;
 
-        let dependencies = node.get("dependencies")
-            .and_then(serde_json::Value::as_array)
-            .ok_or(format!("Couldn't find array entry 'dependencies' in node:\n{}", to_string_pretty(node)))?;
+        let dependencies = as_array_from_value("dependencies", node)?;
 
         let mut dep_versions = Vec::with_capacity(dependencies.len());
         for dep in dependencies {
@@ -186,25 +169,18 @@ fn resolved_nodes<'a>(config: &Config,
     Ok(node_map)
 }
 
-fn source_path<'a>(config: &Config, package: &'a serde_json::Value) -> RtResult<Option<&'a Path>> {
-    let targets = package.get("targets")
-        .and_then(serde_json::Value::as_array)
-        .ok_or(format!("Couldn't find array entry 'targets' in package:\n{}", to_string_pretty(package)))?;
+fn source_path<'a>(config: &Config, package: &'a JsonValue) -> RtResult<Option<&'a Path>> {
+    let targets = as_array_from_value("targets", package)?;
 
     let manifest_dir = {
-        let manifest_path = package.get("manifest_path")
-            .and_then(serde_json::Value::as_str)
-            .map(Path::new)
-            .ok_or(format!("Couldn't find string entry 'manifest_path' in package:\n{}", to_string_pretty(package)))?;
+        let manifest_path = as_str_from_value("manifest_path", package).map(Path::new)?;
 
         manifest_path.parent()
             .ok_or(format!("Couldn't get directory of path '{:?}'", manifest_path.display()))?
     };
 
     for target in targets {
-        let kinds = target.get("kind")
-            .and_then(serde_json::Value::as_array)
-            .ok_or(format!("Couldn't find array entry 'kind' in target:\n{}", to_string_pretty(target)))?;
+        let kinds = as_array_from_value("kind", target)?;
 
         for kind in kinds {
             let kind_str = kind.as_str()
@@ -215,11 +191,7 @@ fn source_path<'a>(config: &Config, package: &'a serde_json::Value) -> RtResult<
                 continue;
             }
 
-            let mut src_path = target.get("src_path")
-                .and_then(serde_json::Value::as_str)
-                .map(Path::new)
-                .ok_or(format!("Couldn't find string entry 'src_path' in target:\n{}", to_string_pretty(target)))?;
-
+            let mut src_path = as_str_from_value("src_path", target).map(Path::new)?;
             if src_path.is_absolute() && src_path.is_file() {
                 src_path = src_path.parent()
                     .ok_or(format!("Couldn't get directory of path '{:?}' in target:\n{}\nof package:\n{}",
@@ -242,6 +214,30 @@ fn source_path<'a>(config: &Config, package: &'a serde_json::Value) -> RtResult<
     Ok(None)
 }
 
-fn to_string_pretty(value: &serde_json::Value) -> String {
+fn to_string_pretty(value: &JsonValue) -> String {
     serde_json::to_string_pretty(value).unwrap_or(String::new())
+}
+
+fn as_array_from_value<'a>(entry: &str, value: &'a JsonValue) -> RtResult<&'a Vec<JsonValue>> {
+    value.get(entry)
+         .and_then(JsonValue::as_array)
+         .ok_or(format!("Couldn't find array entry '{}' in:\n{}", entry, to_string_pretty(value)).into())
+}
+
+fn as_str_from_value<'a>(entry: &str, value: &'a JsonValue) -> RtResult<&'a str> {
+    value.get(entry)
+         .and_then(JsonValue::as_str)
+         .ok_or(format!("Couldn't find string entry '{}' in:\n{}", entry, to_string_pretty(value)).into())
+}
+
+fn as_object_from_value<'a>(entry: &str, value: &'a JsonValue) -> RtResult<&'a JsonObject> {
+    value.get(entry)
+         .and_then(JsonValue::as_object)
+         .ok_or(format!("Couldn't find object entry '{}' in:\n{}", entry, to_string_pretty(value)).into())
+}
+
+fn as_array_from_object<'a>(entry: &str, object: &'a JsonObject) -> RtResult<&'a Vec<JsonValue>> {
+    object.get(entry)
+          .and_then(JsonValue::as_array)
+          .ok_or(format!("Couldn't find array entry '{}' in:\n{:?}", entry, object).into())
 }
