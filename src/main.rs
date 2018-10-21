@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 extern crate toml;
 extern crate tempfile;
 extern crate num_cpus;

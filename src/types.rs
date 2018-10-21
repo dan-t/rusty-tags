@@ -7,7 +7,7 @@ use std::ops::{Drop, Deref};
 use std::fmt;
 
 use fnv::{FnvHasher, FnvHashMap};
-use semver::VersionReq;
+use semver::{Version, VersionReq};
 use streaming_iterator::StreamingIterator;
 use rt_result::RtResult;
 use dirs::{rusty_tags_cache_dir, rusty_tags_locks_dir};
@@ -30,6 +30,11 @@ impl DepTree {
             sources: Vec::new(),
             dependencies: Vec::new()
         }
+    }
+
+    pub fn reserve_num_sources(&mut self, num: usize) {
+        self.sources.reserve(num);
+        self.dependencies.reserve(num);
     }
 
     pub fn roots(&self) -> Sources {
@@ -338,6 +343,47 @@ impl Deref for SourceId {
 
     fn deref(&self) -> &Self::Target {
         &self.id
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, PartialOrd, Ord, Hash)]
+pub struct SourceVersion<'a> {
+    pub name: &'a str,
+    pub version: Version
+}
+
+impl<'a> SourceVersion<'a> {
+    pub fn new(name: &'a str, version: Version) -> SourceVersion<'a> {
+        SourceVersion { name, version }
+    }
+
+    pub fn parse_from_id(id: &'a str) -> RtResult<SourceVersion<'a>> {
+        let mut split = id.split(' ');
+        let name = split.next();
+        if name == None {
+            return Err(format!("Couldn't extract name from id: '{}'", id).into());
+        }
+        let name = name.unwrap();
+
+        let version = split.next();
+        if version == None {
+            return Err(format!("Couldn't extract version from id: '{}'", id).into());
+        }
+        let version = version.unwrap();
+
+        Ok(SourceVersion::new(name, Version::parse(version)?))
+    }
+}
+
+impl<'a> fmt::Debug for SourceVersion<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "({}, {})", self.name, self.version)
+    }
+}
+
+impl<'a> fmt::Display for SourceVersion<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "({}, {})", self.name, self.version)
     }
 }
 
