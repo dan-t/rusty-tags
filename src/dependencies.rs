@@ -47,8 +47,6 @@ fn build_dep_tree<'a>(config: &Config,
     let package = packages.get(source_version)
         .ok_or(format!("[{}] Couldn't find package of {}", depth, source_version))?;
 
-    verbose!(config, "[{}] Found package of {}", depth, source_version);
-
     let dep_source_ids = {
         if config.omit_deps {
             Vec::new()
