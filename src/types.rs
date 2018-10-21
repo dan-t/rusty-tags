@@ -46,9 +46,8 @@ impl DepTree {
         Sources::new(&self.sources, self.dependencies.get(&source.id))
     }
 
-    /// Split the whole tree by his depth, starting with the highest depth,
-    /// Each unique 'SourceId' is returned once with its highest depth. Only
-    /// 'SourceId' are considered for which 'predicate' returns true.
+    /// Split the whole tree by its depth, starting with the biggest depth.
+    /// Each unique 'Source' is returned once with its biggest depth.
     pub fn split_by_depth(&self) -> SplitByDepth {
         type Depth = usize;
         let mut dep_graph = Vec::with_capacity(100);
@@ -58,7 +57,7 @@ impl DepTree {
             self.collect(root, 0, &mut dep_graph, &mut max_depth, &mut sources);
         }
 
-        // sort first by source id and then by higher depth
+        // sort first by source id and then by bigger depth
         sources.sort_unstable_by(|a, b| {
             let ord = a.source.id.cmp(&b.source.id);
             if ord != Ordering::Equal {
@@ -68,10 +67,10 @@ impl DepTree {
             b.depth.cmp(&a.depth)
         });
 
-        // dedup to sources with highest depth
+        // dedup to sources with biggest depth
         sources.dedup_by_key(|i| &i.source.id);
 
-        // sort sources by higher depth
+        // sort sources by bigger depth
         sources.sort_unstable_by(|a, b| b.depth.cmp(&a.depth));
 
         SplitByDepth::new(sources)
