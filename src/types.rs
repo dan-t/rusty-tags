@@ -7,7 +7,7 @@ use std::ops::{Drop, Deref};
 use std::fmt;
 
 use fnv::{FnvHasher, FnvHashMap};
-use semver::{Version, VersionReq};
+use semver::Version;
 use streaming_iterator::StreamingIterator;
 use rt_result::RtResult;
 use dirs::{rusty_tags_cache_dir, rusty_tags_locks_dir};
@@ -384,30 +384,6 @@ impl<'a> fmt::Debug for SourceVersion<'a> {
 impl<'a> fmt::Display for SourceVersion<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "({}, {})", self.name, self.version)
-    }
-}
-
-#[derive(PartialEq, Eq, Clone, PartialOrd, Ord)]
-pub struct SourceReq<'a> {
-    pub name: &'a str,
-    pub req: VersionReq
-}
-
-impl<'a> SourceReq<'a> {
-    pub fn new(name: &'a str, req: VersionReq) -> SourceReq<'a> {
-        SourceReq { name, req }
-    }
-}
-
-impl<'a> fmt::Debug for SourceReq<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "({}, {})", self.name, self.req)
-    }
-}
-
-impl<'a> fmt::Display for SourceReq<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "({}, {})", self.name, self.req)
     }
 }
 
