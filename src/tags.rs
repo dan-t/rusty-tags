@@ -183,6 +183,14 @@ fn merge_tags(config: &Config,
 
     match config.tags_spec.kind {
         TagsKind::Vi => {
+            if dependency_tag_files.is_empty() {
+                if lib_tag_file != into_tag_file {
+                    copy_tags(config, lib_tag_file, into_tag_file)?;
+                }
+
+                return Ok(());
+            }
+
             let mut file_contents: Vec<String> = Vec::with_capacity(dependency_tag_files.len() + 1);
             let mut num_lines: usize = 0;
             {
