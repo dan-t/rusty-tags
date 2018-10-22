@@ -21,17 +21,20 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
 
     let mut thread_pool = Pool::new(config.num_threads);
     let mut sources_by_depth = dep_tree.split_by_depth();
-    while let Some(sources) = sources_by_depth.next() {
-        let sources_to_update = sources.iter()
-            .filter(|swd| config.force_recreate || swd.source.needs_tags_update());
+    while let Some(sources_of_depth) = sources_by_depth.next() {
+        if sources_of_depth.is_empty() {
+            continue;
+        }
+
+        let sources_to_update = sources_of_depth.iter().filter(|s| {
+            s.source.needs_tags_update(config)
+        });
 
         if config.verbose {
-            let tmp_sources: Vec<_> = sources_to_update.clone().collect();
-            if ! tmp_sources.is_empty() {
-                println!("Sources of depth={}", tmp_sources[0].depth);
-                for SourceWithDepth { source, .. } in tmp_sources {
-                    source.print_recreate_status(config);
-                }
+            println!("\nSources of depth={}", sources_of_depth[0].depth);
+
+            for SourceWithDepth { source, .. } in sources_to_update.clone() {
+                println!("   {}", source.recreate_status(config));
             }
         }
 

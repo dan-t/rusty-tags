@@ -298,7 +298,11 @@ impl Source {
         })
     }
 
-    pub fn needs_tags_update(&self) -> bool {
+    pub fn needs_tags_update(&self, config: &Config) -> bool {
+        if config.force_recreate {
+            return true;
+        }
+
         // Tags of the root (the cargo project) should be always recreated,
         // because we don't know which source file has been changed and
         // even if we would know it, we couldn't easily just replace the
@@ -310,24 +314,28 @@ impl Source {
         ! self.cached_tags_file.is_file() || ! self.tags_file.is_file()
     }
 
-    pub fn print_recreate_status(&self, config: &Config) {
+    pub fn recreate_status(&self, config: &Config) -> String {
         if config.force_recreate {
-            println!("Forced recreating of tags for '{}'", self.name);
+            format!("Forced recreating of tags for {}", self.source_version())
         } else if self.is_root {
-            println!("Recreating tags for cargo project root '{}'", self.name);
+            format!("Recreating tags for cargo project root {}", self.source_version())
         } else if ! self.cached_tags_file.is_file() {
-            println!("Recreating tags for '{}', because of missing cache file at '{:?}'",
-                     self.name, self.cached_tags_file);
+            format!("Recreating tags for {}, because of missing cache file at '{:?}'",
+                     self.source_version(), self.cached_tags_file)
         } else if ! self.tags_file.is_file() {
-            println!("Recreating tags for '{}', because of missing tags file at '{:?}'",
-                     self.name, self.tags_file);
+            format!("Recreating tags for {}, because of missing tags file at '{:?}'",
+                     self.source_version(), self.tags_file)
         } else {
-            println!("No recreation needed for '{}'", self.name);
+            format!("No recreation needed for {}", self.source_version())
         }
     }
 
     pub fn lock(&self, tags_spec: &TagsSpec) -> RtResult<SourceLock> {
         SourceLock::new(self, tags_spec)
+    }
+
+    fn source_version(&self) -> String {
+        format!("({}, {})", self.name, self.version)
     }
 }
 
