@@ -82,10 +82,6 @@ impl DepTree {
         SourceId { id }
     }
 
-    pub fn add_root(&mut self, id: SourceId) {
-        self.roots.push(id);
-    }
-
     pub fn set_roots(&mut self, ids: Vec<SourceId>) {
         self.roots = ids;
     }
@@ -271,6 +267,7 @@ impl Drop for SourceLock {
 pub struct Source {
     pub id: SourceId,
     pub name: String,
+    pub version: Version,
     pub dir: PathBuf,
     pub hash: String,
     pub is_root: bool,
@@ -279,19 +276,20 @@ pub struct Source {
 }
 
 impl Source {
-    pub fn new(id: SourceId, name: &str, dir: &Path, is_root: bool, tags_spec: &TagsSpec) -> RtResult<Source> {
+    pub fn new(id: SourceId, source_version: &SourceVersion, dir: &Path, is_root: bool, tags_spec: &TagsSpec) -> RtResult<Source> {
         let cargo_toml_dir = find_dir_upwards_containing("Cargo.toml", dir)?;
         let tags_file = cargo_toml_dir.join(tags_spec.file_name());
         let hash = source_hash(dir);
         let cached_tags_file = {
             let cache_dir = rusty_tags_cache_dir()?;
-            let file_name = format!("{}-{}.{}", name, hash, tags_spec.file_extension());
+            let file_name = format!("{}-{}.{}", source_version.name, hash, tags_spec.file_extension());
             cache_dir.join(&file_name)
         };
 
         Ok(Source {
             id: id,
-            name: name.to_owned(),
+            name: source_version.name.to_owned(),
+            version: source_version.version.clone(),
             dir: dir.to_owned(),
             hash: hash,
             is_root: is_root,
