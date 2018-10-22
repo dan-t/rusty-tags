@@ -51,7 +51,7 @@ impl DepTree {
         type Depth = usize;
         let mut dep_graph = Vec::with_capacity(100);
         let mut max_depth = FnvHashMap::<SourceId, Depth>::default();
-        let mut sources = Vec::with_capacity(100_000);
+        let mut sources = Vec::with_capacity(self.num_non_unique_sources());
         for root in self.roots() {
             self.collect(root, 0, &mut dep_graph, &mut max_depth, &mut sources);
         }
@@ -127,6 +127,21 @@ impl DepTree {
         }
 
         dep_graph.pop();
+    }
+
+    fn num_non_unique_sources(&self) -> usize {
+        self.roots.len() + self.sources.len() + self.num_dependent_sources()
+    }
+
+    fn num_dependent_sources(&self) -> usize {
+        let mut len = 0;
+        for deps in &self.dependencies {
+            if let Some(vec) = deps {
+                len += vec.len();
+            }
+        }
+
+        len
     }
 }
 
