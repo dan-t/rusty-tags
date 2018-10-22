@@ -183,12 +183,13 @@ fn merge_tags(config: &Config,
 
     match config.tags_spec.kind {
         TagsKind::Vi => {
-            let mut file_contents: Vec<String> = Vec::with_capacity(1000);
-
+            let mut file_contents: Vec<String> = Vec::with_capacity(dependency_tag_files.len() + 1);
+            let mut num_lines: usize = 0;
             {
                 let mut file = File::open(lib_tag_file)?;
                 let mut contents = String::new();
                 file.read_to_string(&mut contents)?;
+                num_lines += contents.lines().count();
                 file_contents.push(contents);
             }
 
@@ -196,10 +197,11 @@ fn merge_tags(config: &Config,
                 let mut file = File::open(file)?;
                 let mut contents = String::new();
                 file.read_to_string(&mut contents)?;
+                num_lines += contents.lines().count();
                 file_contents.push(contents);
             }
 
-            let mut merged_lines: Vec<&str> = Vec::with_capacity(100_000);
+            let mut merged_lines: Vec<&str> = Vec::with_capacity(num_lines);
             for content in file_contents.iter() {
                 for line in content.lines() {
                     if let Some(chr) = line.chars().nth(0) {
