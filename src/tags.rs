@@ -229,8 +229,8 @@ fn merge_tags(config: &Config,
 
             let new_line = "\n".as_bytes();
             for line in merged_lines {
-                tag_file.write(line.as_bytes())?;
-                tag_file.write(new_line)?;
+                tag_file.write_all(line.as_bytes())?;
+                tag_file.write_all(new_line)?;
             }
         },
 
