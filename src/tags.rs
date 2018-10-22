@@ -212,7 +212,7 @@ fn merge_tags(config: &Config,
                 }
             }
 
-            verbose!(config, "Num merged lines: {}", merged_lines.len());
+            verbose!(config, "\nNum merged lines: {}", merged_lines.len());
 
             merged_lines.sort_unstable();
             merged_lines.dedup();
