@@ -81,9 +81,14 @@ impl Config {
        let quiet = matches.is_present("quiet");
        let verbose = if quiet { false } else { matches.is_present("verbose") };
 
-       let num_threads = value_t!(matches.value_of("num-threads"), u32)
-           .map(|n| max(1, n))
-           .unwrap_or(num_cpus::get_physical() as u32);
+       let num_threads = if verbose {
+           println!("Switching to single threaded for verbose output");
+           1
+       } else {
+           value_t!(matches.value_of("num-threads"), u32)
+               .map(|n| max(1, n))
+               .unwrap_or(num_cpus::get_physical() as u32)
+       };
 
        if verbose {
            println!("Using configuration: vi_tags='{}', emacs_tags='{}', ctags_exe='{:?}', ctags_options='{}'",
@@ -102,7 +107,7 @@ impl Config {
            force_recreate: force_recreate,
            verbose: verbose,
            quiet: quiet,
-           num_threads: num_threads,
+           num_threads: num_threads
        })
    }
 }
