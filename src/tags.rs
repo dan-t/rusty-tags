@@ -19,7 +19,12 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
         println!("Creating tags for: {:?} ...", names);
     }
 
-    let mut thread_pool = Pool::new(config.num_threads);
+    let mut thread_pool = if config.num_threads > 1 {
+        Some(Pool::new(config.num_threads))
+    } else {
+        None
+    };
+
     let mut sources_by_depth = dep_tree.split_by_depth();
     while let Some(sources_of_depth) = sources_by_depth.next() {
         if sources_of_depth.is_empty() {
@@ -38,14 +43,21 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
             }
         }
 
-        thread_pool.scoped(|scoped| {
+        if let Some(ref mut thread_pool) = thread_pool {
+            thread_pool.scoped(|scoped| {
+                for SourceWithDepth { source, .. } in sources_to_update {
+                    scoped.execute(move || {
+                        let deps = dep_tree.dependencies(source);
+                        update_tags_internal(config, source, deps).unwrap();
+                    });
+                }
+            });
+        } else {
             for SourceWithDepth { source, .. } in sources_to_update {
-                scoped.execute(move || {
-                    let deps = dep_tree.dependencies(source);
-                    update_tags_internal(config, source, deps).unwrap();
-                });
+                let deps = dep_tree.dependencies(source);
+                update_tags_internal(config, source, deps).unwrap();
             }
-        });
+        }
     }
 
     return Ok(());
