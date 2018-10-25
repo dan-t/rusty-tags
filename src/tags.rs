@@ -55,7 +55,7 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
         } else {
             for SourceWithDepth { source, .. } in sources_to_update {
                 let deps = dep_tree.dependencies(source);
-                update_tags_internal(config, source, deps).unwrap();
+                update_tags_internal(config, source, deps)?;
             }
         }
     }
