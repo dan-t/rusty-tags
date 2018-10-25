@@ -26,14 +26,30 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
     };
 
     let mut sources_by_depth = dep_tree.split_by_depth();
+    let mut update_all_left_sources = false;
     while let Some(sources_of_depth) = sources_by_depth.next() {
         if sources_of_depth.is_empty() {
             continue;
         }
 
-        let sources_to_update = sources_of_depth.iter().filter(|s| {
-            s.source.needs_tags_update(config)
-        });
+        // If a source with missing tags was detected, then update all
+        // following, depending sources. This is especially important for
+        // the emacs style tags, because the tags of the dependencies of
+        // a source aren't merged into the source tags file, but only
+        // included with a file reference, and if the file is missing,
+        // then there are no tags for the dependencies.
+
+        let mut sources_to_update = sources_of_depth.iter().peekable();
+        if ! update_all_left_sources {
+            while let Some(SourceWithDepth { source, .. }) = sources_to_update.peek() {
+                if source.needs_tags_update(config) {
+                    update_all_left_sources = true;
+                    break;
+                }
+
+                sources_to_update.next();
+            }
+        }
 
         if config.verbose {
             println!("\nSources of depth={}", sources_of_depth[0].depth);

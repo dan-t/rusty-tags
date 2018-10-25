@@ -342,7 +342,8 @@ impl Source {
             format!("Recreating tags for {}, because of missing tags file at '{:?}'",
                      self.source_version(), self.tags_file)
         } else {
-            format!("No recreation needed for {}", self.source_version())
+            format!("Recreating tags for {}, because one of its dependencies was updated",
+                    self.source_version())
         }
     }
 
