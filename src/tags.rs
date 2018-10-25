@@ -52,10 +52,12 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
         }
 
         if config.verbose {
-            println!("\nSources of depth={}", sources_of_depth[0].depth);
+            if let Some(SourceWithDepth { depth, .. }) = sources_to_update.peek() {
+                println!("\nSources of depth={}", depth);
 
-            for SourceWithDepth { source, .. } in sources_to_update.clone() {
-                println!("   {}", source.recreate_status(config));
+                for SourceWithDepth { source, .. } in sources_to_update.clone() {
+                    println!("   {}", source.recreate_status(config));
+                }
             }
         }
 
