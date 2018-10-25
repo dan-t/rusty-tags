@@ -39,31 +39,31 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
         // included with a file reference, and if the file is missing,
         // then there are no tags for the dependencies.
 
-        let mut sources_to_update = sources_of_depth.iter().peekable();
-        if ! update_all_left_sources {
-            while let Some(SourceWithDepth { source, .. }) = sources_to_update.peek() {
-                if source.needs_tags_update(config) {
+        let sources_to_update: Vec<_> = if update_all_left_sources {
+            sources_of_depth.iter().collect()
+        } else {
+            sources_of_depth.iter().filter(|SourceWithDepth { source, .. }| {
+                let needs_update = source.needs_tags_update(config);
+                if needs_update {
                     update_all_left_sources = true;
-                    break;
                 }
 
-                sources_to_update.next();
-            }
-        }
+                needs_update
+            })
+            .collect()
+        };
 
-        if config.verbose {
-            if let Some(SourceWithDepth { depth, .. }) = sources_to_update.peek() {
-                println!("\nSources of depth={}", depth);
+        if config.verbose && ! sources_to_update.is_empty() {
+            println!("\nSources of depth={}", sources_to_update[0].depth);
 
-                for SourceWithDepth { source, .. } in sources_to_update.clone() {
-                    println!("   {}", source.recreate_status(config));
-                }
+            for SourceWithDepth { source, .. } in &sources_to_update {
+                println!("   {}", source.recreate_status(config));
             }
         }
 
         if let Some(ref mut thread_pool) = thread_pool {
             thread_pool.scoped(|scoped| {
-                for SourceWithDepth { source, .. } in sources_to_update {
+                for SourceWithDepth { source, .. } in &sources_to_update {
                     scoped.execute(move || {
                         let deps = dep_tree.dependencies(source);
                         update_tags_internal(config, source, deps).unwrap();
@@ -71,7 +71,7 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
                 }
             });
         } else {
-            for SourceWithDepth { source, .. } in sources_to_update {
+            for SourceWithDepth { source, .. } in &sources_to_update {
                 let deps = dep_tree.dependencies(source);
                 update_tags_internal(config, source, deps)?;
             }
