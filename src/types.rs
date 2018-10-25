@@ -1,12 +1,13 @@
 use std::path::{Path, PathBuf};
 use std::fs::{self, File};
+use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::process::Command;
 use std::cmp::Ordering;
 use std::ops::{Drop, Deref};
 use std::fmt;
 
-use fnv::{FnvHasher, FnvHashMap};
+use fnv::FnvHashMap;
 use semver::Version;
 use streaming_iterator::StreamingIterator;
 use rt_result::RtResult;
@@ -409,7 +410,7 @@ impl<'a> fmt::Display for SourceVersion<'a> {
 }
 
 fn source_hash(source_dir: &Path) -> String {
-    let mut hasher = FnvHasher::default();
+    let mut hasher = DefaultHasher::new();
     source_dir.hash(&mut hasher);
     hasher.finish().to_string()
 }
