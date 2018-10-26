@@ -152,7 +152,9 @@ pub fn create_tags<P1, P2>(config: &Config, src_dirs: &[P1], tags_file: P2) -> R
     }
 
     if config.verbose {
-        println!("\nCreating tags ...\n   for source:");
+        println!("\nCreating tags ...\n   with command: {:?}", cmd);
+
+        println!("\n   for source:");
         for dir in src_dirs {
             println!("      {}", dir.as_ref().display());
         }
