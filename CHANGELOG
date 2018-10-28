@@ -1,3 +1,9 @@
+3.1.0
+-----
+* Further optimizations for dependency heavy cargo projects
+* Correctly update emacs style tags with missing included tag files
+* Handling of multiple versions of the same library
+
 3.0.0
 -----
 * Several optimizations for dependency heavy cargo projects
