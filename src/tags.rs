@@ -103,7 +103,15 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
             // collect the tags files of reexported dependencies
             let reexported_tags_files: Vec<&Path> = dependencies.clone()
                 .filter(|d| reexported_crates.iter().find(|c| **c == d.name) != None)
-                .map(|d| d.cached_tags_file.as_path())
+                .filter_map(|d| {
+                    if d.cached_tags_file.is_file() {
+                        Some(d.cached_tags_file.as_path())
+                    } else {
+                        verbose!(config, "\nCouldn't find tags file '{}' of reexported crate. Might be a cyclic dependency?",
+                                 d.cached_tags_file.display());
+                        None
+                    }
+                })
                 .collect();
 
             let tmp_cached_tags = NamedTempFile::new_in(rusty_tags_cache_dir()?)?;
@@ -120,7 +128,15 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
         // the tags of 'source' and of its dependencies
         {
             let dep_tags_files: Vec<&Path> = dependencies.clone()
-                .map(|d| d.cached_tags_file.as_path())
+                .filter_map(|d| {
+                    if d.cached_tags_file.is_file() {
+                        Some(d.cached_tags_file.as_path())
+                    } else {
+                        verbose!(config, "\nCouldn't find tags file '{}' of dependency. Might be a cyclic dependency?",
+                                 d.cached_tags_file.display());
+                        None
+                    }
+                })
                 .collect();
 
             let tmp_src_and_dep_tags = NamedTempFile::new_in(&source.dir)?;
