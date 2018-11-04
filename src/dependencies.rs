@@ -131,9 +131,7 @@ fn build_dep_tree(config: &Config,
         verbose!(config, "Building tree for {}", node_version);
 
         let is_root = root_ids.iter().find(|id| **id == node_package.source_id) != None;
-        let source = Source::new(node_package.source_id, &node_version, node_package.source_path,
-                                 is_root, &config.tags_spec)?;
-
+        let source = Source::new(node_package.source_id, &node_version, node_package.source_path, is_root, config)?;
         dep_tree.set_source(source, dep_ids);
     }
 

@@ -3,25 +3,22 @@ use std::fs::{self, File};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::process::Command;
-use std::cmp::Ordering;
 use std::ops::{Drop, Deref};
 use std::fmt;
 
-use fnv::FnvHashMap;
 use semver::Version;
-use streaming_iterator::StreamingIterator;
 use rt_result::RtResult;
 use dirs::{rusty_tags_cache_dir, rusty_tags_locks_dir};
 use config::Config;
-
-type Depth = usize;
+use tempfile::NamedTempFile;
 
 /// The tree describing the dependencies of the whole cargo project.
 #[derive(Debug)]
 pub struct DepTree {
     roots: Vec<SourceId>,
     sources: Vec<Option<Source>>,
-    dependencies: Vec<Option<Vec<SourceId>>>
+    dependencies: Vec<Option<Vec<SourceId>>>,
+    parents: Vec<Option<Vec<SourceId>>>
 }
 
 impl DepTree {
@@ -29,13 +26,15 @@ impl DepTree {
         DepTree {
             roots: Vec::with_capacity(10),
             sources: Vec::new(),
-            dependencies: Vec::new()
+            dependencies: Vec::new(),
+            parents: Vec::new()
         }
     }
 
     pub fn reserve_num_sources(&mut self, num: usize) {
         self.sources.reserve(num);
         self.dependencies.reserve(num);
+        self.parents.reserve(num);
     }
 
     pub fn roots(&self) -> Sources {
@@ -46,40 +45,29 @@ impl DepTree {
         Sources::new(&self.sources, self.dependencies_slice(source))
     }
 
-    /// Split the whole tree by its depth, starting with the biggest depth.
-    /// Each unique 'Source' is returned once with its biggest depth.
-    pub fn split_by_depth(&self) -> SplitByDepth {
-        type Depth = usize;
+    pub fn all_sources(&self) -> impl Iterator<Item=&Source> {
+        self.sources
+            .iter()
+            .filter_map(|s| s.as_ref())
+    }
+
+    /// Get all of the ancestors of 'sources' till the roots.
+    pub fn ancestors<'a>(&'a self, sources: &[&Source]) -> Vec<&'a Source> {
+        let mut ancestor_srcs = Vec::with_capacity(50000);
         let mut dep_graph = Vec::with_capacity(100);
-        let mut max_depth = FnvHashMap::<SourceId, Depth>::default();
-        let mut sources = Vec::with_capacity(self.num_non_unique_sources());
-        for root in self.roots() {
-            self.collect(root, 0, &mut dep_graph, &mut max_depth, &mut sources);
+        for src in sources {
+            self.ancestors_internal(src, &mut ancestor_srcs, &mut dep_graph);
         }
 
-        // sort first by source id and then by bigger depth
-        sources.sort_unstable_by(|a, b| {
-            let ord = a.source.id.cmp(&b.source.id);
-            if ord != Ordering::Equal {
-                return ord;
-            }
-
-            b.depth.cmp(&a.depth)
-        });
-
-        // dedup to sources with biggest depth
-        sources.dedup_by_key(|i| &i.source.id);
-
-        // sort sources by bigger depth
-        sources.sort_unstable_by(|a, b| b.depth.cmp(&a.depth));
-
-        SplitByDepth::new(sources)
+        unique_sources(&mut ancestor_srcs);
+        ancestor_srcs
     }
 
     pub fn new_source(&mut self) -> SourceId {
         let id = self.sources.len();
         self.sources.push(None);
         self.dependencies.push(None);
+        self.parents.push(None);
         SourceId { id }
     }
 
@@ -88,61 +76,49 @@ impl DepTree {
     }
 
     pub fn set_source(&mut self, src: Source, dependencies: Vec<SourceId>) {
-        let id = *src.id;
-        self.sources[id] = Some(src);
-        if ! dependencies.is_empty() {
-            self.dependencies[id] = Some(dependencies);
+        let src_id = src.id;
+        self.sources[*src_id] = Some(src);
+        if dependencies.is_empty() {
+            return;
         }
+
+        for dep in &dependencies {
+            let dep_id: usize = **dep;
+            if self.parents[dep_id].is_none() {
+                self.parents[dep_id] = Some(Vec::with_capacity(10));
+            }
+
+            if let Some(ref mut parents) = self.parents[dep_id] {
+                parents.push(src_id);
+            }
+        }
+
+        self.dependencies[*src_id] = Some(dependencies);
     }
 
     fn dependencies_slice(&self, source: &Source) -> Option<&[SourceId]> {
         self.dependencies[*source.id].as_ref().map(Vec::as_slice)
     }
 
-    fn collect<'a>(&'a self, source: &'a Source, depth: usize,
-                   dep_graph: &mut Vec<SourceId>,
-                   max_depth: &mut FnvHashMap<SourceId, Depth>,
-                   sources: &mut Vec<SourceWithDepth<'a>>) {
-
-        {
-            let max_depth_entry = max_depth.entry(source.id).or_insert(0);
-
-            // the source was already found deeper in the dependency hierarchy
-            if *max_depth_entry > depth {
-                return;
-            } else {
-                *max_depth_entry = depth;
-            }
-        }
-
-        // cyclic dependency detected
-        if let Some(_) = dep_graph.iter().find(|d| **d == source.id) {
-            return;
-        }
-
-        sources.push(SourceWithDepth { source, depth });
+    fn ancestors_internal<'a>(&'a self, source: &Source,
+                              ancestor_srcs: &mut Vec<&'a Source>,
+                              dep_graph: &mut Vec<SourceId>) {
         dep_graph.push(source.id);
+        if let Some(ref parents) = self.parents[*source.id] {
+            for p_id in parents {
+                // cyclic dependency detected
+                if dep_graph.iter().find(|id| *id == p_id) != None {
+                    continue;
+                }
 
-        for dep in self.dependencies(source) {
-            self.collect(dep, depth + 1, dep_graph, max_depth, sources);
+                if let Some(ref p) = self.sources[**p_id] {
+                    ancestor_srcs.push(p);
+                    self.ancestors_internal(p, ancestor_srcs, dep_graph);
+                }
+            }
         }
 
         dep_graph.pop();
-    }
-
-    fn num_non_unique_sources(&self) -> usize {
-        self.roots.len() + self.sources.len() + self.num_dependent_sources()
-    }
-
-    fn num_dependent_sources(&self) -> usize {
-        let mut len = 0;
-        for deps in &self.dependencies {
-            if let Some(vec) = deps {
-                len += vec.len();
-            }
-        }
-
-        len
     }
 }
 
@@ -176,65 +152,6 @@ impl<'a> Iterator for Sources<'a> {
              None
          }
      }
-}
-
-pub struct SourceWithDepth<'a> {
-    pub source: &'a Source,
-    pub depth: usize,
-}
-
-/// Split the 'sources' in continous regions of the same depth.
-pub struct SplitByDepth<'a> {
-    sources: Vec<SourceWithDepth<'a>>,
-
-    first_idx: usize,
-    cur_depth: usize,
-    cur_idx: usize,
-}
-
-impl<'a> SplitByDepth<'a> {
-    pub fn new(sources: Vec<SourceWithDepth<'a>>) -> SplitByDepth<'a> {
-        SplitByDepth {
-            first_idx: 0,
-            cur_depth: if sources.is_empty() { 0 } else { sources[0].depth },
-            cur_idx: 0,
-            sources: sources
-        }
-    }
-}
-
-impl<'a> StreamingIterator for SplitByDepth<'a> {
-    type Item = [SourceWithDepth<'a>];
-
-    #[inline]
-    fn advance(&mut self) {
-        if self.cur_idx > self.sources.len() {
-            return;
-        }
-
-        self.first_idx = self.cur_idx;
-        self.cur_idx += 1;
-
-        self.cur_depth = if self.first_idx < self.sources.len() {
-            self.sources[self.first_idx].depth
-        } else {
-            0
-        };
-
-        while self.cur_idx < self.sources.len()
-                  && self.cur_depth == self.sources[self.cur_idx].depth {
-            self.cur_idx += 1;
-        }
-    }
-
-    #[inline]
-    fn get(&self) -> Option<&Self::Item> {
-        if self.cur_idx > self.sources.len() {
-            return None;
-        }
-
-        Some(&self.sources[self.first_idx .. self.cur_idx])
-    }
 }
 
 /// Lock a source to prevent that multiple running instances
@@ -279,26 +196,45 @@ impl Drop for SourceLock {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Source {
+    /// rusty-tags specific internal id of the source
     pub id: SourceId,
+
     pub name: String,
     pub version: Version,
+
+    /// the root source directory
     pub dir: PathBuf,
+
+    /// hash of 'dir'
     pub hash: String,
+
+    /// if the source is a root of the dependency tree,
+    /// which means that it's a workspace member
     pub is_root: bool,
+
+    /// path to the tags file in the source directory,
+    /// beside of the 'Cargo.toml' file, this tags file
+    /// contains of the tags of the source and of its
+    /// dependencies
     pub tags_file: PathBuf,
+
+    /// path to the tags file in the rusty-tags cache directory,
+    /// this tags file contains the tags of the source and
+    /// only the tags of the dependencies that have a public
+    /// export from the source
     pub cached_tags_file: PathBuf,
 }
 
 impl Source {
-    pub fn new(id: SourceId, source_version: &SourceVersion, dir: &Path, is_root: bool, tags_spec: &TagsSpec) -> RtResult<Source> {
+    pub fn new(id: SourceId, source_version: &SourceVersion, dir: &Path, is_root: bool, config: &Config) -> RtResult<Source> {
         let cargo_toml_dir = find_dir_upwards_containing("Cargo.toml", dir)?;
-        let tags_file = cargo_toml_dir.join(tags_spec.file_name());
+        let tags_file = cargo_toml_dir.join(config.tags_spec.file_name());
         let hash = source_hash(dir);
         let cached_tags_file = {
             let cache_dir = rusty_tags_cache_dir()?;
-            let file_name = format!("{}-{}.{}", source_version.name, hash, tags_spec.file_extension());
+            let file_name = format!("{}-{}.{}", source_version.name, hash, config.tags_spec.file_extension());
             cache_dir.join(&file_name)
         };
 
@@ -353,6 +289,20 @@ impl Source {
 
     fn source_version(&self) -> String {
         format!("({}, {})", self.name, self.version)
+    }
+}
+
+pub struct SourceWithTmpTags<'a> {
+    pub source: &'a Source,
+    pub tags_file: NamedTempFile,
+}
+
+impl<'a> SourceWithTmpTags<'a> {
+    pub fn new(source: &'a Source) -> RtResult<SourceWithTmpTags<'a>> {
+        Ok(SourceWithTmpTags {
+            source,
+            tags_file: NamedTempFile::new()?
+        })
     }
 }
 
@@ -521,6 +471,11 @@ impl TagsSpec {
             cmd.arg(&self.ctags_options);
         }
     }
+}
+
+pub fn unique_sources(sources: &mut Vec<&Source>) {
+    sources.sort_unstable_by(|a, b| a.id.cmp(&b.id));
+    sources.dedup_by_key(|s| &s.id);
 }
 
 fn find_dir_upwards_containing(file_name: &str, start_dir: &Path) -> RtResult<PathBuf> {

@@ -4,19 +4,48 @@ use std::path::Path;
 
 use tempfile::NamedTempFile;
 use scoped_threadpool::Pool;
-use streaming_iterator::StreamingIterator;
 use fnv::FnvHashSet;
 
 use rt_result::RtResult;
-use types::{TagsKind, Source, Sources, DepTree, SourceWithDepth};
+use types::{TagsKind, SourceWithTmpTags, Sources, DepTree, unique_sources};
 use config::Config;
 use dirs::rusty_tags_cache_dir;
 
-/// Update the tags of all sources of 'roots'.
+/// Update the tags of all sources in 'dep_tree'
 pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
     if ! config.quiet {
         let names: Vec<_> = dep_tree.roots().map(|r| &r.name).collect();
         println!("Creating tags for: {:?} ...", names);
+    }
+
+    let sources_to_update: Vec<_> = dep_tree.all_sources().filter(|s| {
+        s.needs_tags_update(config)
+    })
+    .collect();
+
+    // If a source with missing tags was detected (the 'sources_to_update' above), then all
+    // dependent (ancestor) sources have also to be updated. This is especially important for the
+    // emacs style tags, because the tags of the dependencies of a source aren't merged into the
+    // source tags file, but only included with a file reference, and if the file is missing, then
+    // there are no tags for the dependencies.
+    let sources_to_update = {
+        let mut srcs = dep_tree.ancestors(&sources_to_update);
+        srcs.extend(&sources_to_update);
+        unique_sources(&mut srcs);
+
+        let mut srcs_with_tags = Vec::with_capacity(srcs.len());
+        for src in &srcs {
+            srcs_with_tags.push(SourceWithTmpTags::new(src)?);
+        }
+
+        srcs_with_tags
+    };
+
+    if config.verbose && ! sources_to_update.is_empty() {
+        println!("\nCreating tags for sources:");
+        for SourceWithTmpTags { source, .. } in &sources_to_update {
+            println!("   {}", source.recreate_status(config));
+        }
     }
 
     let mut thread_pool = if config.num_threads > 1 {
@@ -25,65 +54,43 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
         None
     };
 
-    let mut sources_by_depth = dep_tree.split_by_depth();
-    let mut update_all_left_sources = false;
-    while let Some(sources_of_depth) = sources_by_depth.next() {
-        if sources_of_depth.is_empty() {
-            continue;
-        }
-
-        // If a source with missing tags was detected, then update all
-        // following, depending sources. This is especially important for
-        // the emacs style tags, because the tags of the dependencies of
-        // a source aren't merged into the source tags file, but only
-        // included with a file reference, and if the file is missing,
-        // then there are no tags for the dependencies.
-
-        let sources_to_update: Vec<_> = if update_all_left_sources {
-            sources_of_depth.iter().collect()
-        } else {
-            sources_of_depth.iter().filter(|SourceWithDepth { source, .. }| {
-                let needs_update = source.needs_tags_update(config);
-                if needs_update {
-                    update_all_left_sources = true;
-                }
-
-                needs_update
-            })
-            .collect()
-        };
-
-        if config.verbose && ! sources_to_update.is_empty() {
-            println!("\nSources of depth={}", sources_to_update[0].depth);
-
-            for SourceWithDepth { source, .. } in &sources_to_update {
-                println!("   {}", source.recreate_status(config));
+    // create the tags for each source in 'sources_to_update'
+    if let Some(ref mut thread_pool) = thread_pool {
+        thread_pool.scoped(|scoped| {
+            for SourceWithTmpTags { source, tags_file } in &sources_to_update {
+                scoped.execute(move || {
+                    create_tags(config, &[&source.dir], tags_file.path()).unwrap();
+                });
             }
+        });
+    } else {
+        for SourceWithTmpTags { source, tags_file } in &sources_to_update {
+            create_tags(config, &[&source.dir], tags_file.path())?;
         }
+    }
 
-        if let Some(ref mut thread_pool) = thread_pool {
-            thread_pool.scoped(|scoped| {
-                for SourceWithDepth { source, .. } in &sources_to_update {
-                    scoped.execute(move || {
-                        let deps = dep_tree.dependencies(source);
-                        update_tags_internal(config, source, deps).unwrap();
-                    });
-                }
-            });
-        } else {
-            for SourceWithDepth { source, .. } in &sources_to_update {
-                let deps = dep_tree.dependencies(source);
-                update_tags_internal(config, source, deps)?;
+    // merge the source tags with the dependency tags
+    if let Some(ref mut thread_pool) = thread_pool {
+        thread_pool.scoped(|scoped| {
+            for src in &sources_to_update {
+                scoped.execute(move || {
+                    let deps = dep_tree.dependencies(src.source);
+                    update_tags_internal(config, src, deps).unwrap();
+                });
             }
+        });
+    } else {
+        for src in &sources_to_update {
+            let deps = dep_tree.dependencies(src.source);
+            update_tags_internal(config, src, deps)?;
         }
     }
 
     return Ok(());
 
-    fn update_tags_internal<'a>(config: &Config, source: &'a Source, dependencies: Sources<'a>) -> RtResult<()> {
-        // create tags for 'source'
-        let tmp_src_tags = NamedTempFile::new()?;
-        create_tags(config, &[&source.dir], tmp_src_tags.path())?;
+    fn update_tags_internal<'a>(config: &Config, source_with_tags: &SourceWithTmpTags<'a>, dependencies: Sources<'a>) -> RtResult<()> {
+        let source = source_with_tags.source;
+        let tmp_src_tags = source_with_tags.tags_file.path();
 
         // create the cached tags file of 'source' which
         // might also contain the tags of dependencies if they're
@@ -116,9 +123,9 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
 
             let tmp_cached_tags = NamedTempFile::new_in(rusty_tags_cache_dir()?)?;
             if ! reexported_tags_files.is_empty() {
-                merge_tags(config, tmp_src_tags.path(), &reexported_tags_files, tmp_cached_tags.path())?;
+                merge_tags(config, tmp_src_tags, &reexported_tags_files, tmp_cached_tags.path())?;
             } else {
-                copy_tags(config, tmp_src_tags.path(), tmp_cached_tags.path())?;
+                copy_tags(config, tmp_src_tags, tmp_cached_tags.path())?;
             }
 
             move_tags(config, tmp_cached_tags.path(), &source.cached_tags_file)?;
@@ -141,9 +148,9 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
 
             let tmp_src_and_dep_tags = NamedTempFile::new_in(&source.dir)?;
             if ! dep_tags_files.is_empty() {
-                merge_tags(config, tmp_src_tags.path(), &dep_tags_files, tmp_src_and_dep_tags.path())?;
+                merge_tags(config, tmp_src_tags, &dep_tags_files, tmp_src_and_dep_tags.path())?;
             } else {
-                copy_tags(config, tmp_src_tags.path(), tmp_src_and_dep_tags.path())?;
+                copy_tags(config, tmp_src_tags, tmp_src_and_dep_tags.path())?;
             }
 
             move_tags(config, tmp_src_and_dep_tags.path(), &source.tags_file)?;

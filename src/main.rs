@@ -7,7 +7,6 @@ extern crate num_cpus;
 extern crate scoped_threadpool;
 extern crate serde;
 extern crate serde_json;
-extern crate streaming_iterator;
 extern crate fnv;
 extern crate semver;
 
