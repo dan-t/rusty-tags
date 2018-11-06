@@ -215,8 +215,8 @@ impl SourceLock {
 
 impl Drop for SourceLock {
     fn drop(&mut self) {
-        match self {
-            SourceLock::Locked { path, .. } => {
+        match *self {
+            SourceLock::Locked { ref path, .. } => {
                 if path.is_file() {
                     let _ = fs::remove_file(&path);
                 }

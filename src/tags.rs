@@ -42,7 +42,7 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
 
     if config.verbose && ! sources_to_update.is_empty() {
         println!("\nCreating tags for sources:");
-        for SourceWithTmpTags { source, .. } in &sources_to_update {
+        for &SourceWithTmpTags { source, .. } in &sources_to_update {
             println!("   {}", source.recreate_status(config));
         }
     }
@@ -57,14 +57,14 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
     // only the tags of the source without considering the dependencies.
     if let Some(ref mut thread_pool) = thread_pool {
         thread_pool.scoped(|scoped| {
-            for SourceWithTmpTags { source, tags_file } in &sources_to_update {
+            for &SourceWithTmpTags { ref source, ref tags_file } in &sources_to_update {
                 scoped.execute(move || {
                     create_tags(config, &[&source.dir], tags_file.path()).unwrap();
                 });
             }
         });
     } else {
-        for SourceWithTmpTags { source, tags_file } in &sources_to_update {
+        for &SourceWithTmpTags { ref source, ref tags_file } in &sources_to_update {
             create_tags(config, &[&source.dir], tags_file.path())?;
         }
     }
