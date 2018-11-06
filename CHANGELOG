@@ -1,3 +1,9 @@
+3.2.0
+-----
+* Further optimizations for dependency heavy cargo projects
+* Now really - hopefully for all times - fix handling of cyclic dependencies
+* Ensure support to at least rustc 1.20.0
+
 3.1.0
 -----
 * Further optimizations for dependency heavy cargo projects
