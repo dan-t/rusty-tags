@@ -24,10 +24,9 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
     .collect();
 
     // If a source with missing tags was detected (the 'sources_to_update' above), then all
-    // dependent (ancestor) sources have also to be updated. This is especially important for the
-    // emacs style tags, because the tags of the dependencies of a source aren't merged into the
-    // source tags file, but only included with a file reference, and if the file is missing, then
-    // there are no tags for the dependencies.
+    // dependent (ancestor) sources also have to be updated. The reason for the missing tags
+    // might be a version change of the source - by changes in the 'Cargo.toml' - so all
+    // dependent sources have to be rebuild to include the new version.
     let sources_to_update = {
         let mut srcs = dep_tree.ancestors(&sources_to_update);
         srcs.extend(&sources_to_update);
@@ -54,7 +53,8 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
         None
     };
 
-    // create the tags for each source in 'sources_to_update'
+    // Create the tags for each source in 'sources_to_update'. This creates
+    // only the tags of the source without considering the dependencies.
     if let Some(ref mut thread_pool) = thread_pool {
         thread_pool.scoped(|scoped| {
             for SourceWithTmpTags { source, tags_file } in &sources_to_update {
@@ -69,7 +69,11 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
         }
     }
 
-    // merge the source tags with the dependency tags
+    // Creates the cachable tags of each source in 'sources_to_update'. The cachable
+    // tags contain the tags of the source and the tags of the public exported dependencies.
+    // Furthermore creates the final tags of each source in 'sources_to_update'. The
+    // final tags contain
+    //
     if let Some(ref mut thread_pool) = thread_pool {
         thread_pool.scoped(|scoped| {
             for src in &sources_to_update {

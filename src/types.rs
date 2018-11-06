@@ -15,9 +15,21 @@ use tempfile::NamedTempFile;
 /// The tree describing the dependencies of the whole cargo project.
 #[derive(Debug)]
 pub struct DepTree {
+    /// the roots, the workspace members of the cargo project,
+    /// the source ids are indices into 'sources'
     roots: Vec<SourceId>,
+
+    /// all sources of the cargo project, the roots and all direct
+    /// and indirect dependencies
     sources: Vec<Option<Source>>,
+
+    /// the dependencies of each source in 'sources', the source
+    /// ids are indices into 'sources'
     dependencies: Vec<Option<Vec<SourceId>>>,
+
+    /// the parents - the dependent sources - of each
+    /// source in 'sources', the source ids are indices into
+    /// 'sources'
     parents: Vec<Option<Vec<SourceId>>>
 }
 
@@ -63,6 +75,7 @@ impl DepTree {
         ancestor_srcs
     }
 
+    /// Reserve space for a new source and return its source id.
     pub fn new_source(&mut self) -> SourceId {
         let id = self.sources.len();
         self.sources.push(None);
@@ -122,10 +135,17 @@ impl DepTree {
     }
 }
 
+/// An iterator over sources by their source ids.
 #[derive(Clone)]
 pub struct Sources<'a> {
+    /// all sources
     sources: &'a [Option<Source>],
+
+    /// the sources to iterate over, 'source_ids'
+    /// are indices into 'sources'
     source_ids: Option<&'a [SourceId]>,
+
+    /// the current index into 'source_ids'
     idx: usize
 }
 
@@ -155,13 +175,24 @@ impl<'a> Iterator for Sources<'a> {
 }
 
 /// Lock a source to prevent that multiple running instances
-/// of 'rusty-tags' update the same source.
+/// of 'rusty-tags' update the same source at once.
+///
+/// This is only an optimization and not needed for correctness,
+/// because the tags are written to a temporary file which is then
+/// moved to its final place. It's ensured that the moving happens
+/// on the same partition/file system and therefore the move is
+/// an atomic operation which can't be affected by an other
+/// running instance of 'rusty-tags'. So multiple running
+/// 'rusty-tags' can't write at once to the same file.
 pub enum SourceLock {
+    /// this running instance of 'rusty-tags' holds the lock
     Locked {
         path: PathBuf,
         file: File
     },
 
+    /// an other instance of 'rusty-tags' holds the lock,
+    /// or the other instance couldn't cleanup the lock correctly
     AlreadyLocked {
         path: PathBuf
     }
@@ -201,7 +232,10 @@ pub struct Source {
     /// rusty-tags specific internal id of the source
     pub id: SourceId,
 
+    /// the 'Cargo.toml' name of the source
     pub name: String,
+
+    /// the 'Cargo.toml' version of the source
     pub version: Version,
 
     /// the root source directory
@@ -292,8 +326,14 @@ impl Source {
     }
 }
 
+/// Temporary struct for the tags updating of the source. It's
+/// used to create and associate a temporary file to the source
+/// for its tags creation.
 pub struct SourceWithTmpTags<'a> {
+    /// the source to update
     pub source: &'a Source,
+
+    /// temporary file for the tags of the source
     pub tags_file: NamedTempFile,
 }
 
@@ -306,6 +346,8 @@ impl<'a> SourceWithTmpTags<'a> {
     }
 }
 
+/// An unique runtime specific 'rusty-tags' internal id
+/// of the source.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Debug)]
 pub struct SourceId {
     id: usize
@@ -319,9 +361,13 @@ impl Deref for SourceId {
     }
 }
 
+/// A temporary struct used for the reading of the result of 'cargo metadata'.
 #[derive(PartialEq, Eq, Clone, PartialOrd, Ord, Hash)]
 pub struct SourceVersion<'a> {
+    /// the 'Cargo.toml' name of the source
     pub name: &'a str,
+
+    /// the 'Cargo.toml' version of the source
     pub version: Version
 }
 
@@ -330,6 +376,8 @@ impl<'a> SourceVersion<'a> {
         SourceVersion { name, version }
     }
 
+    /// Parses an id from 'cargo metadata' (e.g "dtoa 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)")
+    /// into a 'SourceVersion'.
     pub fn parse_from_id(id: &'a str) -> RtResult<SourceVersion<'a>> {
         let mut split = id.split(' ');
         let name = split.next();
