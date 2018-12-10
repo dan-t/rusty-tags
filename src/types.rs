@@ -262,8 +262,7 @@ pub struct Source {
 }
 
 impl Source {
-    pub fn new(id: SourceId, source_version: &SourceVersion, dir: &Path, is_root: bool, config: &Config) -> RtResult<Source> {
-        let cargo_toml_dir = find_dir_upwards_containing("Cargo.toml", dir)?;
+    pub fn new(id: SourceId, source_version: &SourceVersion, dir: &Path, cargo_toml_dir: &Path, is_root: bool, config: &Config) -> RtResult<Source> {
         let tags_file = cargo_toml_dir.join(config.tags_spec.file_name());
         let hash = source_hash(dir);
         let cached_tags_file = {

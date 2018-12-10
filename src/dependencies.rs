@@ -35,7 +35,8 @@ fn workspace_members(metadata: &JsonValue) -> RtResult<Vec<SourceVersion>> {
 
 struct Package<'a> {
     pub source_id: SourceId,
-    pub source_path: &'a Path
+    pub source_path: &'a Path,
+    pub manifest_path: &'a Path
 }
 
 type Packages<'a> = FnvHashMap<SourceVersion<'a>, Package<'a>>;
@@ -51,19 +52,12 @@ fn packages<'a>(config: &Config,
         let id = as_str_from_value("id", package)?;
         let source_version = SourceVersion::parse_from_id(id)?;
 
-        let source_path = {
-            let path = source_path(config, package)?;
-            if path == None {
-                continue;
-            }
+        if let Some((source_path, manifest_path)) = source_and_manifest_paths(config, package)? {
+            verbose!(config, "Found package of {} with source at '{}' and manifest at '{}'", source_version, source_path.display(), manifest_path.display());
 
-            path.unwrap()
+            let source_id = dep_tree.new_source();
+            package_map.insert(source_version, Package { source_id, source_path, manifest_path });
         };
-
-        verbose!(config, "Found package of {} with source at '{}'", source_version, source_path.display());
-
-        let source_id = dep_tree.new_source();
-        package_map.insert(source_version, Package { source_id, source_path });
     }
 
     Ok(package_map)
@@ -131,7 +125,7 @@ fn build_dep_tree(config: &Config,
         verbose!(config, "Building tree for {}", node_version);
 
         let is_root = root_ids.iter().find(|id| **id == node_package.source_id) != None;
-        let source = Source::new(node_package.source_id, &node_version, node_package.source_path, is_root, config)?;
+        let source = Source::new(node_package.source_id, &node_version, node_package.source_path, node_package.manifest_path, is_root, config)?;
         dep_tree.set_source(source, dep_ids);
     }
 
@@ -143,7 +137,7 @@ fn package<'a>(source_version: &SourceVersion<'a>, packages: &'a Packages) -> Rt
         .ok_or(format!("Couldn't find package for {}", source_version).into())
 }
 
-fn source_path<'a>(config: &Config, package: &'a JsonValue) -> RtResult<Option<&'a Path>> {
+fn source_and_manifest_paths<'a>(config: &Config, package: &'a JsonValue) -> RtResult<Option<(&'a Path, &'a Path)>> {
     let targets = as_array_from_value("targets", package)?;
 
     let manifest_dir = {
@@ -181,7 +175,7 @@ fn source_path<'a>(config: &Config, package: &'a JsonValue) -> RtResult<Option<&
                                    src_path.display(), to_string_pretty(target), to_string_pretty(package)).into());
             }
 
-            return Ok(Some(src_path));
+            return Ok(Some((src_path, manifest_dir)));
         }
     }
 
