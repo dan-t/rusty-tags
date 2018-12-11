@@ -9,6 +9,7 @@ extern crate serde;
 extern crate serde_json;
 extern crate fnv;
 extern crate semver;
+extern crate dirs as extern_dirs;
 
 #[macro_use]
 extern crate serde_derive;

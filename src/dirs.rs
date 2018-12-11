@@ -1,6 +1,6 @@
 use std::fs;
-use std::env;
 use std::path::{Path, PathBuf};
+use extern_dirs;
 
 use rt_result::RtResult;
 
@@ -40,7 +40,7 @@ fn home_dir() -> RtResult<PathBuf> {
 }
 
 fn home_dir_internal() -> RtResult<PathBuf> {
-    if let Some(path) = env::home_dir() {
+    if let Some(path) = extern_dirs::home_dir() {
         Ok(path)
     } else {
         Err("Couldn't read home directory!".into())
