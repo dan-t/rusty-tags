@@ -263,8 +263,8 @@ pub struct Source {
 
 impl Source {
     pub fn new(id: SourceId, source_version: &SourceVersion, dir: &Path, is_root: bool, config: &Config) -> RtResult<Source> {
-        let cargo_toml_dir = find_dir_upwards_containing("Cargo.toml", dir)?;
-        let tags_file = cargo_toml_dir.join(config.tags_spec.file_name());
+        let tags_dir = find_dir_upwards_containing("Cargo.toml", dir).unwrap_or(dir.to_path_buf());
+        let tags_file = tags_dir.join(config.tags_spec.file_name());
         let hash = source_hash(dir);
         let cached_tags_file = {
             let cache_dir = rusty_tags_cache_dir()?;
