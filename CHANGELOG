@@ -1,3 +1,9 @@
+3.3.0
+-----
+* Add indexing of 'unsafe Trait' for 'excuberant ctags'
+* Use 'home_dir' of 'dirs' crate instead of 'env::home_dir'
+* Don't expect a 'Cargo.toml' in an ancestor directory of the source
+
 3.2.0
 -----
 * Further optimizations for dependency heavy cargo projects
