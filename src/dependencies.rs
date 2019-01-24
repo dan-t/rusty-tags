@@ -160,7 +160,7 @@ fn source_path<'a>(config: &Config, package: &'a JsonValue) -> RtResult<Option<&
             let kind_str = kind.as_str()
                 .ok_or(format!("Expected 'kind' of type string but found: {}", to_string_pretty(kind)))?;
 
-            if kind_str != "bin" && ! kind_str.contains("lib") && kind_str != "proc-macro" {
+            if kind_str != "bin" && ! kind_str.contains("lib") && kind_str != "proc-macro" && kind_str != "test" {
                 verbose!(config, "Unsupported target kind: {}", kind_str);
                 continue;
             }
