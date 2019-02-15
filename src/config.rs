@@ -49,6 +49,7 @@ impl Config {
            .arg_from_usage("-v --verbose 'Verbose output about all operations'")
            .arg_from_usage("-q --quiet 'Don't output anything but errors'")
            .arg_from_usage("-n --num-threads [NUM] 'Num threads used for the tags creation (default: num available physical cpus)'")
+           .arg_from_usage("-O --output-name [FILENAME] 'Name of output tags file. Will use the same name for both vi and emacs'")
            .get_matches();
 
        let start_dir = matches.value_of("start-dir")
@@ -65,11 +66,19 @@ impl Config {
            let mut et = "rusty-tags.emacs".to_string();
            let mut cte = None;
            let mut cto = "".to_string();
+
+           // Override defaults with file config
            if let Some(file_config) = ConfigFromFile::load()? {
                if let Some(fcvt) = file_config.vi_tags { vt = fcvt; }
                if let Some(fcet) = file_config.emacs_tags { et = fcet; }
                cte = file_config.ctags_exe;
                if let Some(fccto) = file_config.ctags_options { cto = fccto; }
+           }
+
+           // Override defaults with commandline options
+           if let Some(cltf) = matches.value_of("output-name") {
+               vt = cltf.to_string();
+               et = cltf.to_string();
            }
 
            (vt, et, cte, cto)

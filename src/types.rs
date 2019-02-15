@@ -451,10 +451,6 @@ pub struct TagsSpec {
 
 impl TagsSpec {
     pub fn new(kind: TagsKind, exe: TagsExe, vi_tags: String, emacs_tags: String, ctags_options: String) -> RtResult<TagsSpec> {
-        if vi_tags == emacs_tags {
-            return Err(format!("It's not supported to use the same tags name '{}' for vi and emacs!", vi_tags).into());
-        }
-
         Ok(TagsSpec {
             kind: kind,
             exe: exe,
