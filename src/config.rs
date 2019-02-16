@@ -60,6 +60,7 @@ impl Config {
            return Err(format!("Invalid directory given to '--start-dir': '{}'!", start_dir.display()).into());
        }
 
+       let kind = value_t_or_exit!(matches.value_of("TAGS_KIND"), TagsKind);
 
        let (vi_tags, emacs_tags, ctags_exe, ctags_options) = {
            let mut vt = "rusty-tags.vi".to_string();
@@ -77,14 +78,17 @@ impl Config {
 
            // Override defaults with commandline options
            if let Some(cltf) = matches.value_of("output-name") {
-               vt = cltf.to_string();
-               et = cltf.to_string();
+
+               match kind {
+                   TagsKind::Vi    => vt = cltf.to_string(),
+                   TagsKind::Emacs => et = cltf.to_string()
+                   
+               }
            }
 
            (vt, et, cte, cto)
        };
 
-       let kind = value_t_or_exit!(matches.value_of("TAGS_KIND"), TagsKind);
        let omit_deps = matches.is_present("omit-deps");
        let force_recreate = matches.is_present("force-recreate");
        let quiet = matches.is_present("quiet");
