@@ -49,7 +49,7 @@ impl Config {
            .arg_from_usage("-v --verbose 'Verbose output about all operations'")
            .arg_from_usage("-q --quiet 'Don't output anything but errors'")
            .arg_from_usage("-n --num-threads [NUM] 'Num threads used for the tags creation (default: num available physical cpus)'")
-           .arg_from_usage("-O --output [FILENAME] 'Name of output tags file. Will use the same name for both vi and emacs'")
+           .arg_from_usage("-O --output [FILENAME] 'Name of output tags file.'")
            .get_matches();
 
        let start_dir = matches.value_of("start-dir")
@@ -77,8 +77,7 @@ impl Config {
            }
 
            // Override defaults with commandline options
-           if let Some(cltf) = matches.value_of("output-name") {
-
+           if let Some(cltf) = matches.value_of("output") {
                match kind {
                    TagsKind::Vi    => vt = cltf.to_string(),
                    TagsKind::Emacs => et = cltf.to_string()
