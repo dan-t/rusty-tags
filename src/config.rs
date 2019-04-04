@@ -81,7 +81,6 @@ impl Config {
                match kind {
                    TagsKind::Vi    => vt = cltf.to_string(),
                    TagsKind::Emacs => et = cltf.to_string()
-                   
                }
            }
 
@@ -171,8 +170,8 @@ fn map_file<R, F>(file: &Path, f: F) -> RtResult<R>
 }
 
 fn detect_tags_exe(ctags_exe: &Option<String>) -> RtResult<TagsExe> {
-    let exes = if let &Some(ref exe) = ctags_exe {
-        vec![exe.as_str()]
+    let exes = if ctags_exe.is_some() && ! ctags_exe.as_ref().unwrap().is_empty() {
+        vec![ctags_exe.as_ref().unwrap().as_str()]
     } else {
         vec!["ctags", "exuberant-ctags", "exctags", "universal-ctags", "uctags"]
     };
