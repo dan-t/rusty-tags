@@ -1,3 +1,7 @@
+3.5.1
+-----
+* Better handling of empty ctags_exe config, by using the default ctag exe names
+
 3.5.0
 -----
 * Add option -O/--output for naming tags files
