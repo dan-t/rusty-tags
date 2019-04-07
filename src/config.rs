@@ -170,10 +170,9 @@ fn map_file<R, F>(file: &Path, f: F) -> RtResult<R>
 }
 
 fn detect_tags_exe(ctags_exe: &Option<String>) -> RtResult<TagsExe> {
-    let exes = if ctags_exe.is_some() && ! ctags_exe.as_ref().unwrap().is_empty() {
-        vec![ctags_exe.as_ref().unwrap().as_str()]
-    } else {
-        vec!["ctags", "exuberant-ctags", "exctags", "universal-ctags", "uctags"]
+    let exes = match ctags_exe {
+        Some(ref exe) if exe != "" => vec![exe.as_str()],
+        _                          => vec!["ctags", "exuberant-ctags", "exctags", "universal-ctags", "uctags"]
     };
 
     for exe in &exes {
