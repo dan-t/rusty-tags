@@ -85,20 +85,6 @@ The current supported configuration at `~/.rusty-tags/config.toml` (defaults dis
     # options given to the ctags executable
     ctags_options = ""
 
-Emacs Configuration
-===================
-
-Install (counsel-etags)[https://github.com/redguardtoo/counsel-etags].
-
-Create file `.dir-locals.el` in rust project root:
-
-    ((nil . ((counsel-etags-update-tags-backend . (lambda (src-dir) (shell-command "rusty-tags emacs")))
-             (counsel-etags-tags-file-name . "rusty-tags.emacs"))))
-
-Use `M-x counsel-etags-find-tag-at-point` for code navigation.
-
-Please note tags file is automatically updated by `counsel-etags`.
-
 Vim Configuration
 =================
 
@@ -118,6 +104,20 @@ The second line ensures that your projects tag file gets updated if a file is wr
 If you've supplied the rust source code by defining `$RUST_SRC_PATH`:
 
     autocmd BufRead *.rs :setlocal tags=./rusty-tags.vi;/,$RUST_SRC_PATH/rusty-tags.vi
+
+Emacs Configuration
+===================
+
+Install [counsel-etags](https://github.com/redguardtoo/counsel-etags).
+
+Create file `.dir-locals.el` in rust project root:
+
+    ((nil . ((counsel-etags-update-tags-backend . (lambda (src-dir) (shell-command "rusty-tags emacs")))
+             (counsel-etags-tags-file-name . "rusty-tags.emacs"))))
+
+Use `M-x counsel-etags-find-tag-at-point` for code navigation.
+
+Please note tags file is automatically updated by `counsel-etags`.
 
 Sublime Configuration
 =====================
