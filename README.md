@@ -48,6 +48,10 @@ Rust Standard Library Support
 Tags for the standard library are created if the rust source is supplied by
 defining the environment variable `RUST_SRC_PATH`.
 
+These tags aren't automatically added to the tags of the cargo project and have
+to be added manually with the path `$RUST_SRC_PATH/rusty-tags.vi` or
+`$RUST_SRC_PATH/rusty-tags.emacs`.
+
 If you're using [rustup](<https://www.rustup.rs/>) you can get the
 rust source of the currently used compiler version by calling:
 
