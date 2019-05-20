@@ -114,14 +114,15 @@ Emacs Configuration
 
 Install [counsel-etags](https://github.com/redguardtoo/counsel-etags).
 
-Create file `.dir-locals.el` in rust project root:
+Create file `.dir-locals.el` in rust project root (please note the line to set `counsel-etags-extra-tags-files` is optional):
 
     ((nil . ((counsel-etags-update-tags-backend . (lambda (src-dir) (shell-command "rusty-tags emacs")))
+             (counsel-etags-extra-tags-files . ("~/third-party-lib/rusty-tags.emacs" "$RUST_SRC_PATH/rusty-tags.emacs"))
              (counsel-etags-tags-file-name . "rusty-tags.emacs"))))
 
 Use `M-x counsel-etags-find-tag-at-point` for code navigation.
 
-Please note tags file is automatically updated by `counsel-etags`.
+`counsel-etags` will automatically detect and update tags file in project root. So no extra setup is required.
 
 Sublime Configuration
 =====================
