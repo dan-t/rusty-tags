@@ -39,9 +39,6 @@ After its run a `rusty-tags.vi / rusty-tags.emacs` file should be beside of the
 Additionally every dependency gets a tags file at its source directory, so
 jumping further to its dependencies is possible.
 
-If a dependency reexports parts of its own dependencies, then these reexported
-parts are also contained in the tags file of the dependency.
-
 Rust Standard Library Support
 =============================
 
@@ -95,19 +92,14 @@ Vim Configuration
 Put this into your `~/.vimrc` file:
 
     autocmd BufRead *.rs :setlocal tags=./rusty-tags.vi;/
-    autocmd BufWritePost *.rs :silent! exec "!rusty-tags vi --quiet --start-dir=" . expand('%:p:h') . "&" | redraw!
 
-The first line (only supported by vim >= 7.4) ensures that vim will
-automatically search for a `rusty-tags.vi` file upwards the directory hierarchy.
-
-This tags setting is important if you want to jump to dependencies and
-then further jump to theirs dependencies.
-
-The second line ensures that your projects tag file gets updated if a file is written.
-
-If you've supplied the rust source code by defining `$RUST_SRC_PATH`:
+Or if you've supplied the rust source code by defining `RUST_SRC_PATH`:
 
     autocmd BufRead *.rs :setlocal tags=./rusty-tags.vi;/,$RUST_SRC_PATH/rusty-tags.vi
+
+And:
+
+    autocmd BufWritePost *.rs :silent! exec "!rusty-tags vi --quiet --start-dir=" . expand('%:p:h') . "&" | redraw!
 
 Emacs Configuration
 ===================
@@ -131,7 +123,11 @@ The plugin [CTags](https://github.com/SublimeText/CTags) uses vi style tags, so
 calling `rusty-tags vi` should work.
 
 By default it expects tag files with the name `.tags`, which can be set
-with `vi_tags = ".tags"` inside of `~/.rusty-tags/config.toml`.
+in `~/.rusty-tags/config.toml`:
+
+    vi_tags = ".tags"
+
+Or by calling `rusty-tags vi --output=".tags"`.
 
 MacOS Issues
 ============
