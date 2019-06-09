@@ -414,7 +414,7 @@ fn source_hash(source_dir: &Path) -> String {
     hasher.finish().to_string()
 }
 
-/// which kind of tags are created
+// which kind of tags are created
 arg_enum! {
     #[derive(Eq, PartialEq, Debug)]
     pub enum TagsKind {
