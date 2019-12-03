@@ -3,7 +3,7 @@ rust:
   - stable
   - beta
   - nightly
-  - 1.24.1
+  - 1.34.2
 
 notifications:
   email:
