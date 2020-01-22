@@ -19,6 +19,9 @@ pub struct Config {
     /// start directory for the search of the 'Cargo.toml'
     pub start_dir: PathBuf,
 
+    /// output directory for the tags for the standard library
+    pub output_dir_std: Option<PathBuf>,
+
     /// do not generate tags for dependencies
     pub omit_deps: bool,
 
@@ -44,6 +47,7 @@ impl Config {
            .author("Daniel Trstenjak <daniel.trstenjak@gmail.com>")
            .arg_from_usage("<TAGS_KIND> 'The kind of the created tags (vi, emacs)'")
            .arg_from_usage("-s --start-dir [DIR] 'Start directory for the search of the Cargo.toml (default: current working directory)'")
+           .arg_from_usage("--output-dir-std [DIR] 'Set the output directory for the tags for the Rust standard library (default: $RUST_SRC_PATH)'")
            .arg_from_usage("-o --omit-deps 'Do not generate tags for dependencies'")
            .arg_from_usage("-f --force-recreate 'Forces the recreation of the tags of all dependencies and the Rust standard library'")
            .arg_from_usage("-v --verbose 'Verbose output about all operations'")
@@ -58,6 +62,14 @@ impl Config {
 
        if ! start_dir.is_dir() {
            return Err(format!("Invalid directory given to '--start-dir': '{}'!", start_dir.display()).into());
+       }
+
+       let output_dir_std = matches.value_of("output-dir-std").map(PathBuf::from);
+
+       if let Some(ref output_dir_std) = output_dir_std {
+           if ! output_dir_std.is_dir() {
+               return Err(format!("Invalid directory given to '--output-dir-std': '{}'!", output_dir_std.display()).into());
+           }
        }
 
        let kind = value_t_or_exit!(matches.value_of("TAGS_KIND"), TagsKind);
@@ -114,6 +126,7 @@ impl Config {
        Ok(Config {
            tags_spec: TagsSpec::new(kind, ctags_exe, vi_tags, emacs_tags, ctags_options)?,
            start_dir: start_dir,
+           output_dir_std: output_dir_std,
            omit_deps: omit_deps,
            force_recreate: force_recreate,
            verbose: verbose,
