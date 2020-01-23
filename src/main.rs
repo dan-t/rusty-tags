@@ -131,7 +131,11 @@ fn update_std_lib_tags(config: &Config) -> RtResult<()> {
         return Err(format!("Missing rust source code at '{}'!", src_path.display()).into());
     }
 
-    let std_lib_tags = src_path.join(config.tags_spec.file_name());
+    let output_path = match config.output_dir_std {
+        Some(ref path_buf) => path_buf.as_path(),
+        None => src_path,
+    };
+    let std_lib_tags = output_path.join(config.tags_spec.file_name());
     if std_lib_tags.is_file() && ! config.force_recreate {
         return Ok(());
     }
@@ -165,7 +169,7 @@ fn update_std_lib_tags(config: &Config) -> RtResult<()> {
 
     info!(config, "Creating tags for the standard library ...");
 
-    let tmp_std_lib_tags = NamedTempFile::new_in(&src_path)?;
+    let tmp_std_lib_tags = NamedTempFile::new_in(&output_path)?;
     create_tags(config, &src_dirs, tmp_std_lib_tags.path())?;
     move_tags(config, tmp_std_lib_tags.path(), &std_lib_tags)?;
 
