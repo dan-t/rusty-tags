@@ -57,7 +57,7 @@ impl DepTree {
         Sources::new(&self.sources, self.dependencies_slice(source))
     }
 
-    pub fn all_sources<'a>(&'a self) -> Box<Iterator<Item=&Source> + 'a> {
+    pub fn all_sources<'a>(&'a self) -> Box<dyn Iterator<Item=&Source> + 'a> {
         Box::new(self.sources
                      .iter()
                      .filter_map(|s| s.as_ref()))
