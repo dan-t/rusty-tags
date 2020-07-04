@@ -72,8 +72,7 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
     // Creates the cachable tags of each source in 'sources_to_update'. The cachable
     // tags contain the tags of the source and the tags of the public exported dependencies.
     // Furthermore creates the final tags of each source in 'sources_to_update'. The
-    // final tags contain
-    //
+    // final tags contain the tags of the source and of all direct dependencies.
     if let Some(ref mut thread_pool) = thread_pool {
         thread_pool.scoped(|scoped| {
             for src in &sources_to_update {
