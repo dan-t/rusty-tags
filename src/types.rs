@@ -250,13 +250,13 @@ pub struct Source {
 
     /// path to the tags file in the source directory,
     /// beside of the 'Cargo.toml' file, this tags file
-    /// contains of the tags of the source and of its
+    /// contains the tags of the source and of its
     /// dependencies
     pub tags_file: PathBuf,
 
     /// path to the tags file in the rusty-tags cache directory,
     /// this tags file contains the tags of the source and
-    /// only the tags of the dependencies that have a public
+    /// the tags of the dependencies that have a public
     /// export from the source
     pub cached_tags_file: PathBuf,
 }
