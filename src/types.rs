@@ -187,8 +187,7 @@ impl<'a> Iterator for Sources<'a> {
 pub enum SourceLock {
     /// this running instance of 'rusty-tags' holds the lock
     Locked {
-        path: PathBuf,
-        file: File
+        path: PathBuf
     },
 
     /// an other instance of 'rusty-tags' holds the lock,
@@ -205,8 +204,8 @@ impl SourceLock {
         if lock_file.is_file() {
             Ok(SourceLock::AlreadyLocked { path: lock_file })
         } else {
+            let _ = File::create(&lock_file)?;
             Ok(SourceLock::Locked {
-                file: File::create(&lock_file)?,
                 path: lock_file
             })
         }
