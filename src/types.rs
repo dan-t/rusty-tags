@@ -199,7 +199,7 @@ pub enum SourceLock {
 
 impl SourceLock {
     fn new(source: &Source, tags_spec: &TagsSpec) -> RtResult<SourceLock> {
-        let file_name = format!("{}-{}.{}", source.name, source.hash, tags_spec.file_extension());
+        let file_name = source.unique_file_name(tags_spec);
         let lock_file = rusty_tags_locks_dir()?.join(file_name);
         if lock_file.is_file() {
             Ok(SourceLock::AlreadyLocked { path: lock_file })
@@ -320,6 +320,11 @@ impl Source {
         SourceLock::new(self, tags_spec)
     }
 
+    /// create a file name that's unique for each source
+    pub fn unique_file_name(&self, tags_spec: &TagsSpec) -> String {
+        format!("{}-{}.{}", self.name, self.hash, tags_spec.file_extension())
+    }
+
     fn source_version(&self) -> String {
         format!("({}, {})", self.name, self.version)
     }
@@ -337,8 +342,8 @@ pub struct SourceWithTmpTags<'a> {
 }
 
 impl<'a> SourceWithTmpTags<'a> {
-    pub fn new(source: &'a Source, config: &Config) -> RtResult<SourceWithTmpTags<'a>> {
-        let file_name = format!("{}-{}.{}", source.name, source.hash, config.tags_spec.file_extension());
+    pub fn new(source: &'a Source, tags_spec: &TagsSpec) -> RtResult<SourceWithTmpTags<'a>> {
+        let file_name = source.unique_file_name(tags_spec);
         let tags_file = env::temp_dir().join(file_name);
         let _ = File::create(tags_file.as_path())?;
         Ok(SourceWithTmpTags { source, tags_file })

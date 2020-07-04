@@ -34,7 +34,7 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
 
         let mut srcs_with_tags = Vec::with_capacity(srcs.len());
         for src in &srcs {
-            srcs_with_tags.push(SourceWithTmpTags::new(src, config)?);
+            srcs_with_tags.push(SourceWithTmpTags::new(src, &config.tags_spec)?);
         }
 
         srcs_with_tags
