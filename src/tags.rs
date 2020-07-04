@@ -34,7 +34,7 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
 
         let mut srcs_with_tags = Vec::with_capacity(srcs.len());
         for src in &srcs {
-            srcs_with_tags.push(SourceWithTmpTags::new(src)?);
+            srcs_with_tags.push(SourceWithTmpTags::new(src, config)?);
         }
 
         srcs_with_tags
@@ -59,13 +59,13 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
         thread_pool.scoped(|scoped| {
             for &SourceWithTmpTags { ref source, ref tags_file } in &sources_to_update {
                 scoped.execute(move || {
-                    create_tags(config, &[&source.dir], tags_file.path()).unwrap();
+                    create_tags(config, &[&source.dir], tags_file.as_path()).unwrap();
                 });
             }
         });
     } else {
         for &SourceWithTmpTags { ref source, ref tags_file } in &sources_to_update {
-            create_tags(config, &[&source.dir], tags_file.path())?;
+            create_tags(config, &[&source.dir], tags_file.as_path())?;
         }
     }
 
@@ -94,7 +94,7 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
 
     fn update_tags_internal<'a>(config: &Config, source_with_tags: &SourceWithTmpTags<'a>, dependencies: Sources<'a>) -> RtResult<()> {
         let source = source_with_tags.source;
-        let tmp_src_tags = source_with_tags.tags_file.path();
+        let tmp_src_tags = source_with_tags.tags_file.as_path();
 
         // create the cached tags file of 'source' which
         // might also contain the tags of dependencies if they're

@@ -5,12 +5,12 @@ use std::hash::{Hash, Hasher};
 use std::process::Command;
 use std::ops::{Drop, Deref};
 use std::fmt;
+use std::env;
 
 use semver::Version;
 use rt_result::RtResult;
 use dirs::{rusty_tags_cache_dir, rusty_tags_locks_dir};
 use config::Config;
-use tempfile::NamedTempFile;
 
 /// The tree describing the dependencies of the whole cargo project.
 #[derive(Debug)]
@@ -334,15 +334,23 @@ pub struct SourceWithTmpTags<'a> {
     pub source: &'a Source,
 
     /// temporary file for the tags of the source
-    pub tags_file: NamedTempFile,
+    pub tags_file: PathBuf,
 }
 
 impl<'a> SourceWithTmpTags<'a> {
-    pub fn new(source: &'a Source) -> RtResult<SourceWithTmpTags<'a>> {
-        Ok(SourceWithTmpTags {
-            source,
-            tags_file: NamedTempFile::new()?
-        })
+    pub fn new(source: &'a Source, config: &Config) -> RtResult<SourceWithTmpTags<'a>> {
+        let file_name = format!("{}-{}.{}", source.name, source.hash, config.tags_spec.file_extension());
+        let tags_file = env::temp_dir().join(file_name);
+        let _ = File::create(tags_file.as_path())?;
+        Ok(SourceWithTmpTags { source, tags_file })
+    }
+}
+
+impl<'a> Drop for SourceWithTmpTags<'a> {
+    fn drop(&mut self) {
+        if self.tags_file.is_file() {
+            let _ = fs::remove_file(&self.tags_file);
+        }
     }
 }
 
