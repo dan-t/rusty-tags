@@ -16,6 +16,7 @@ pub fn dependency_tree(config: &Config, metadata: &JsonValue) -> RtResult<DepTre
     let packages = packages(config, metadata, &mut dep_tree)?;
 
     build_dep_tree(config, metadata, &packages, &mut dep_tree)?;
+    dep_tree.compute_depths();
 
     Ok(dep_tree)
 }

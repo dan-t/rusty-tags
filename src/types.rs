@@ -5,6 +5,8 @@ use std::hash::{Hash, Hasher};
 use std::process::Command;
 use std::ops::{Drop, Deref};
 use std::fmt;
+use std::cmp;
+use std::mem;
 use tempfile::{self, TempDir};
 
 use semver::Version;
@@ -107,6 +109,38 @@ impl DepTree {
         }
 
         self.dependencies[*src_id] = Some(dependencies);
+    }
+
+    pub fn compute_depths(&mut self) {
+        let mut visited = Vec::<SourceId>::with_capacity(100);
+        let roots = mem::replace(&mut self.roots, vec![]);
+        for id in &roots {
+            self.compute_depths_internal(*id, 0, &mut visited)
+        }
+
+        mem::replace(&mut self.roots, roots);
+    }
+
+    fn compute_depths_internal(&mut self, source_id: SourceId, depth: u32, visited: &mut Vec<SourceId>) {
+        // cyclic dependency detected
+        if visited.iter().find(|id| **id == source_id) != None {
+            return;
+        }
+
+        if let Some(ref mut source) = &mut self.sources[source_id.id] {
+            source.max_depth = cmp::max(source.max_depth, depth);
+        }
+
+        visited.push(source_id);
+        if let Some(dep_ids) = mem::replace(&mut self.dependencies[source_id.id], None) {
+            for id in &dep_ids {
+                self.compute_depths_internal(*id, depth + 1, visited);
+            }
+
+            mem::replace(&mut self.dependencies[source_id.id], Some(dep_ids));
+        }
+
+        visited.pop();
     }
 
     fn dependencies_slice(&self, source: &Source) -> Option<&[SourceId]> {
@@ -247,6 +281,11 @@ pub struct Source {
     /// which means that it's a workspace member
     pub is_root: bool,
 
+    /// the max depth of the source inside of the dependency tree,
+    /// a source might be referenced multiple times and 'max_depth'
+    /// contains the greatest depth of the source
+    pub max_depth: u32,
+
     /// path to the tags file in the source directory,
     /// beside of the 'Cargo.toml' file, this tags file
     /// contains the tags of the source and of its
@@ -273,6 +312,7 @@ impl Source {
 
         Ok(Source {
             id: id,
+            max_depth: 0,
             name: source_version.name.to_owned(),
             version: source_version.version.clone(),
             dir: dir.to_owned(),

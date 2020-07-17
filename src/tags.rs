@@ -32,6 +32,11 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
         srcs.extend(&sources_to_update);
         unique_sources(&mut srcs);
 
+        // sort the sources by their depth in the dependency tree to ensure that
+        // the sources are processed bottom to top, that the tags of dependencies
+        // are build before the tags of parents
+        srcs.sort_unstable_by(|a, b| b.max_depth.cmp(&a.max_depth));
+
         let mut srcs_with_tags = Vec::with_capacity(srcs.len());
         for src in &srcs {
             srcs_with_tags.push(SourceWithTmpTags::new(src, &config.tags_spec)?);
