@@ -7,7 +7,6 @@ use std::ops::{Drop, Deref};
 use std::fmt;
 use std::cmp;
 use std::mem;
-use tempfile::{self, TempDir};
 
 use semver::Version;
 use rt_result::RtResult;
@@ -378,20 +377,14 @@ pub struct SourceWithTmpTags<'a> {
     pub source: &'a Source,
 
     /// temporary file for the tags of the source
-    pub tags_file: PathBuf,
-
-    #[allow(dead_code)]
-    /// deleted on drop
-    temp_dir: TempDir
+    pub tags_file: PathBuf
 }
 
 impl<'a> SourceWithTmpTags<'a> {
-    pub fn new(source: &'a Source, tags_spec: &TagsSpec) -> RtResult<SourceWithTmpTags<'a>> {
-        let temp_dir = tempfile::tempdir()?;
-        let file_name = source.unique_file_name(tags_spec);
-        let tags_file = temp_dir.path().join(file_name);
-        let _ = File::create(tags_file.as_path())?;
-        Ok(SourceWithTmpTags { source, tags_file, temp_dir })
+    pub fn new(config: &Config, source: &'a Source) -> RtResult<SourceWithTmpTags<'a>> {
+        let file_name = source.unique_file_name(&config.tags_spec);
+        let tags_file = config.temp_file(&file_name)?;
+        Ok(SourceWithTmpTags { source, tags_file })
     }
 }
 

@@ -10,6 +10,7 @@ use num_cpus;
 use types::{TagsExe, TagsKind, TagsSpec};
 use rt_result::RtResult;
 use dirs;
+use tempfile::TempDir;
 
 /// the configuration used to run rusty-tags
 pub struct Config {
@@ -35,7 +36,10 @@ pub struct Config {
     pub quiet: bool,
 
     /// num threads used for the tags creation
-    pub num_threads: u32
+    pub num_threads: u32,
+
+    /// temporary directory for created tags
+    temp_dir: TempDir
 }
 
 impl Config {
@@ -131,8 +135,15 @@ impl Config {
            force_recreate: force_recreate,
            verbose: verbose,
            quiet: quiet,
-           num_threads: num_threads
+           num_threads: num_threads,
+           temp_dir: TempDir::new()?
        })
+   }
+
+   pub fn temp_file(&self, name: &str) -> RtResult<PathBuf> {
+       let file_path = self.temp_dir.path().join(name);
+       let _ = File::create(&file_path)?;
+       Ok(file_path)
    }
 }
 
