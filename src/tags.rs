@@ -15,7 +15,16 @@ use dirs::rusty_tags_cache_dir;
 pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
     if ! config.quiet {
         let names: Vec<_> = dep_tree.roots().map(|r| &r.name).collect();
-        println!("Creating tags for: {:?} ...", names);
+        let num_names = names.len();
+        print!("Creating tags for: ");
+        for i in 0..num_names {
+            print!("{}", &names[i]);
+            if i < (num_names - 1) {
+                print!(", ");
+            }
+        }
+
+        print!(" ...\n");
     }
 
     let sources_to_update: Vec<_> = dep_tree.all_sources().filter(|s| {
