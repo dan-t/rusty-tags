@@ -68,9 +68,9 @@ impl DepTree {
     /// Get all of the ancestors of 'sources' till the roots.
     pub fn ancestors<'a>(&'a self, sources: &[&Source]) -> Vec<&'a Source> {
         let mut ancestor_srcs = Vec::with_capacity(50000);
-        let mut dep_graph = Vec::with_capacity(100);
+        let mut visited = Vec::with_capacity(100);
         for src in sources {
-            self.ancestors_internal(src, &mut ancestor_srcs, &mut dep_graph);
+            self.ancestors_internal(src, &mut ancestor_srcs, &mut visited);
         }
 
         unique_sources(&mut ancestor_srcs);
@@ -149,23 +149,23 @@ impl DepTree {
 
     fn ancestors_internal<'a>(&'a self, source: &Source,
                               ancestor_srcs: &mut Vec<&'a Source>,
-                              dep_graph: &mut Vec<SourceId>) {
-        dep_graph.push(source.id);
+                              visited: &mut Vec<SourceId>) {
+        visited.push(source.id);
         if let Some(ref parents) = self.parents[*source.id] {
             for p_id in parents {
                 // cyclic dependency detected
-                if dep_graph.iter().find(|id| *id == p_id) != None {
+                if visited.iter().find(|id| *id == p_id) != None {
                     continue;
                 }
 
                 if let Some(ref p) = self.sources[**p_id] {
                     ancestor_srcs.push(p);
-                    self.ancestors_internal(p, ancestor_srcs, dep_graph);
+                    self.ancestors_internal(p, ancestor_srcs, visited);
                 }
             }
         }
 
-        dep_graph.pop();
+        visited.pop();
     }
 }
 
