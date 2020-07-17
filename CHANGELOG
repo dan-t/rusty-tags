@@ -1,3 +1,8 @@
+3.6.0
+-----
+* Reduce the number of open files
+* Fix the order in which tags for sources are created
+
 3.5.1
 -----
 * Better handling of empty ctags_exe config, by using the default ctag exe names
