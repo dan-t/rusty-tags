@@ -112,12 +112,12 @@ impl DepTree {
 
     pub fn compute_depths(&mut self) {
         let mut visited = Vec::<SourceId>::with_capacity(100);
-        let roots = mem::replace(&mut self.roots, vec![]);
+        let roots = mem::take(&mut self.roots);
         for id in &roots {
             self.compute_depths_internal(*id, 0, &mut visited)
         }
 
-        mem::replace(&mut self.roots, roots);
+        self.roots = roots;
     }
 
     fn compute_depths_internal(&mut self, source_id: SourceId, depth: u32, visited: &mut Vec<SourceId>) {
@@ -131,12 +131,12 @@ impl DepTree {
         }
 
         visited.push(source_id);
-        if let Some(dep_ids) = mem::replace(&mut self.dependencies[source_id.id], None) {
+        if let Some(dep_ids) = mem::take(&mut self.dependencies[source_id.id]) {
             for id in &dep_ids {
                 self.compute_depths_internal(*id, depth + 1, visited);
             }
 
-            mem::replace(&mut self.dependencies[source_id.id], Some(dep_ids));
+            self.dependencies[source_id.id] = Some(dep_ids);
         }
 
         visited.pop();
