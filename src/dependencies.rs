@@ -81,13 +81,23 @@ fn build_dep_tree(config: &Config,
 
         let mut ids = Vec::with_capacity(workspace_members.len());
         for member in &workspace_members {
-            ids.push(package(member, packages)?.source_id);
+            let member_package = package(member, packages)?;
+            ids.push(member_package.source_id);
+            if config.omit_deps {
+                let is_root = true;
+                let source = Source::new(member_package.source_id, member,
+                                         member_package.source_path, is_root, config)?;
+                dep_tree.set_source(source, vec![]);
+            }
         }
 
         ids
     };
 
     dep_tree.set_roots(root_ids.clone());
+    if config.omit_deps {
+        return Ok(());
+    }
 
     let nodes = {
         let resolve = as_object_from_value("resolve", metadata)?;
