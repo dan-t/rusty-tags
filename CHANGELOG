@@ -1,3 +1,7 @@
+3.7.0
+-----
+* Fix '--omit-deps' option
+
 3.6.0
 -----
 * Reduce the number of open files
