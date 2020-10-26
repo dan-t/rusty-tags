@@ -54,19 +54,12 @@ rust source of the currently used compiler version by calling:
 
     $ rustup component add rust-src
 
-And then setting `RUST_SRC_PATH` inside of e.g. `~/.bashrc`:
+And then setting `RUST_SRC_PATH` inside of e.g. `~/.bashrc`.
+For `rustc >= 1.47.0`:
+    $ export RUST_SRC_PATH=$(rustc --print sysroot)/lib/rustlib/src/rust/library/
 
+For `rustc < 1.47.0`:
     $ export RUST_SRC_PATH=$(rustc --print sysroot)/lib/rustlib/src/rust/src/
-
-Or without `rustup` by getting the rust source by yourself:
-
-    $ git clone https://github.com/rust-lang/rust.git /home/you/rust
-    $ cd /home/you/rust
-    $ git checkout stable
-    $ export RUST_SRC_PATH=/home/you/rust/src/   # should be defined in your ~/.bashrc
-
-Using `rustup` is the recommended way, because then you will automatically get
-the correct standard library tags for the currently used compiler version.
 
 Configuration
 =============

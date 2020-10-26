@@ -141,6 +141,21 @@ fn update_std_lib_tags(config: &Config) -> RtResult<()> {
     }
 
     let possible_src_dirs = [
+        // rustc >= 1.47.0
+        "alloc",
+        "core",
+        "panic_abort",
+        "panic_unwind",
+        "proc_macro",
+        "profiler_builtins",
+        "rtstartup",
+        "std",
+        "stdarch",
+        "term",
+        "test",
+        "unwind",
+
+        // rustc < 1.47.0
         "liballoc",
         "libarena",
         "libbacktrace",
@@ -165,6 +180,10 @@ fn update_std_lib_tags(config: &Config) -> RtResult<()> {
         if src_dir.is_dir() {
             src_dirs.push(src_dir);
         }
+    }
+
+    if src_dirs.is_empty() {
+        return Err(format!("No source directories found for standard library in:\n    '{}'.\n\nPlease set the standard library source path depending on your rustc version.\nFor rustc >= 1.47.0:\n    export RUST_SRC_PATH=$(rustc --print sysroot)/lib/rustlib/src/rust/library/\nFor rustc < 1.47.0:\n    $ export RUST_SRC_PATH=$(rustc --print sysroot)/lib/rustlib/src/rust/src/", src_path.display()).into());
     }
 
     info!(config, "Creating tags for the standard library ...");
