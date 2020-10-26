@@ -376,7 +376,7 @@ dependencies = [
 
 [[package]]
 name = "rusty-tags"
-version = "3.8.0"
+version = "3.8.1"
 dependencies = [
  "clap",
  "dirs",

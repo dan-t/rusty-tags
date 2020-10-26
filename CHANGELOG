@@ -1,3 +1,7 @@
+3.8.1
+-----
+* Beautify error format
+
 3.8.0
 -----
 * Fix standard library tags creation for rustc >= 1.47.0
