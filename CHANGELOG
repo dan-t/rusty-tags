@@ -1,3 +1,7 @@
+3.8.0
+-----
+* Fix standard library tags creation for rustc >= 1.47.0
+
 3.7.0
 -----
 * Fix '--omit-deps' option
