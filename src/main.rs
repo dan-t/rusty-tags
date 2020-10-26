@@ -183,7 +183,17 @@ fn update_std_lib_tags(config: &Config) -> RtResult<()> {
     }
 
     if src_dirs.is_empty() {
-        return Err(format!("No source directories found for standard library in:\n    '{}'.\n\nPlease set the standard library source path depending on your rustc version.\nFor rustc >= 1.47.0:\n    export RUST_SRC_PATH=$(rustc --print sysroot)/lib/rustlib/src/rust/library/\nFor rustc < 1.47.0:\n    $ export RUST_SRC_PATH=$(rustc --print sysroot)/lib/rustlib/src/rust/src/", src_path.display()).into());
+        return Err(format!(r#"
+No source directories found for standard library source at $RUST_SRC_PATH:
+    '{}'
+
+Please set the standard library source path depending on your rustc version.
+
+For rustc >= 1.47.0:
+    $ export RUST_SRC_PATH=$(rustc --print sysroot)/lib/rustlib/src/rust/library/
+
+For rustc < 1.47.0:
+    $ export RUST_SRC_PATH=$(rustc --print sysroot)/lib/rustlib/src/rust/src/"#, src_path.display()).into());
     }
 
     info!(config, "Creating tags for the standard library ...");
