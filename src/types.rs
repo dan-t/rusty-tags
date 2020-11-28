@@ -5,7 +5,6 @@ use std::hash::{Hash, Hasher};
 use std::process::Command;
 use std::ops::{Drop, Deref};
 use std::fmt;
-use std::cmp;
 use std::mem;
 
 use semver::Version;
@@ -67,9 +66,8 @@ impl DepTree {
     /// Get all of the ancestors of 'sources' till the roots.
     pub fn ancestors<'a>(&'a self, sources: &[&Source]) -> Vec<&'a Source> {
         let mut ancestor_srcs = Vec::with_capacity(50000);
-        let mut visited = Vec::with_capacity(100);
         for src in sources {
-            self.ancestors_internal(src, &mut ancestor_srcs, &mut visited);
+            self.ancestors_internal(src, &mut ancestor_srcs, &mut Vec::with_capacity(50000));
         }
 
         unique_sources(&mut ancestor_srcs);
@@ -127,7 +125,10 @@ impl DepTree {
         }
 
         if let Some(ref mut source) = &mut self.sources[source_id.id] {
-            source.max_depth = cmp::max(source.max_depth, depth);
+            if source.max_depth >= depth {
+                return;
+            }
+            source.max_depth = depth;
         }
 
         visited.push(source_id);
@@ -163,8 +164,6 @@ impl DepTree {
                 }
             }
         }
-
-        visited.pop();
     }
 }
 
