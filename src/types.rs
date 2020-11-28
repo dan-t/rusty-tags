@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::fs::{self, File};
 use std::collections::hash_map::DefaultHasher;
+use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use std::process::Command;
 use std::ops::{Drop, Deref};
@@ -67,7 +68,7 @@ impl DepTree {
     /// Get all of the ancestors of 'sources' till the roots.
     pub fn ancestors<'a>(&'a self, sources: &[&Source]) -> Vec<&'a Source> {
         let mut ancestor_srcs = Vec::with_capacity(50000);
-        let mut visited = Vec::with_capacity(100);
+        let mut visited = HashSet::new();
         for src in sources {
             self.ancestors_internal(src, &mut ancestor_srcs, &mut visited);
         }
@@ -111,35 +112,33 @@ impl DepTree {
     }
 
     pub fn compute_depths(&mut self) {
-        let mut visited = Vec::<SourceId>::with_capacity(100);
         let roots = mem::replace(&mut self.roots, vec![]);
         for id in &roots {
-            self.compute_depths_internal(*id, 0, &mut visited)
+            self.compute_depths_internal(*id, 0)
         }
 
         self.roots = roots;
     }
 
-    fn compute_depths_internal(&mut self, source_id: SourceId, depth: u32, visited: &mut Vec<SourceId>) {
-        // cyclic dependency detected
-        if visited.iter().find(|id| **id == source_id) != None {
-            return;
-        }
-
+    fn compute_depths_internal(&mut self, source_id: SourceId, depth: u32) {
         if let Some(ref mut source) = &mut self.sources[source_id.id] {
-            source.max_depth = cmp::max(source.max_depth, depth);
+            // source already visited, just update 'max_depth'
+            if let Some(max_depth) = source.max_depth {
+                source.max_depth = Some(cmp::max(max_depth, depth));
+                return;
+            }
+            else {
+                source.max_depth = Some(depth);
+            }
         }
 
-        visited.push(source_id);
         if let Some(dep_ids) = mem::replace(&mut self.dependencies[source_id.id], None) {
             for id in &dep_ids {
-                self.compute_depths_internal(*id, depth + 1, visited);
+                self.compute_depths_internal(*id, depth + 1);
             }
 
             self.dependencies[source_id.id] = Some(dep_ids);
         }
-
-        visited.pop();
     }
 
     fn dependencies_slice(&self, source: &Source) -> Option<&[SourceId]> {
@@ -148,23 +147,21 @@ impl DepTree {
 
     fn ancestors_internal<'a>(&'a self, source: &Source,
                               ancestor_srcs: &mut Vec<&'a Source>,
-                              visited: &mut Vec<SourceId>) {
-        visited.push(source.id);
+                              visited: &mut HashSet<SourceId>) {
+        // cyclic dependency detected
+        if visited.contains(&source.id) {
+            return;
+        }
+
+        visited.insert(source.id);
         if let Some(ref parents) = self.parents[*source.id] {
             for p_id in parents {
-                // cyclic dependency detected
-                if visited.iter().find(|id| *id == p_id) != None {
-                    continue;
-                }
-
                 if let Some(ref p) = self.sources[**p_id] {
                     ancestor_srcs.push(p);
                     self.ancestors_internal(p, ancestor_srcs, visited);
                 }
             }
         }
-
-        visited.pop();
     }
 }
 
@@ -283,7 +280,7 @@ pub struct Source {
     /// the max depth of the source inside of the dependency tree,
     /// a source might be referenced multiple times and 'max_depth'
     /// contains the greatest depth of the source
-    pub max_depth: u32,
+    pub max_depth: Option<u32>,
 
     /// path to the tags file in the source directory,
     /// beside of the 'Cargo.toml' file, this tags file
@@ -311,7 +308,7 @@ impl Source {
 
         Ok(Source {
             id: id,
-            max_depth: 0,
+            max_depth: None,
             name: source_version.name.to_owned(),
             version: source_version.version.clone(),
             dir: dir.to_owned(),
