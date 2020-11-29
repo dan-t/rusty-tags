@@ -67,13 +67,18 @@ impl DepTree {
 
     /// Get all of the ancestors of 'sources' till the roots.
     pub fn ancestors<'a>(&'a self, sources: &[&Source]) -> Vec<&'a Source> {
-        let mut ancestor_srcs = Vec::with_capacity(50000);
-        let mut visited = HashSet::new();
+        let mut ancestor_ids = HashSet::with_capacity(50000);
         for src in sources {
-            self.ancestors_internal(src, &mut ancestor_srcs, &mut visited);
+            self.ancestors_internal(src.id, &mut ancestor_ids);
         }
 
-        unique_sources(&mut ancestor_srcs);
+        let mut ancestor_srcs = Vec::with_capacity(ancestor_ids.len());
+        for id in &ancestor_ids {
+            if let Some(ref src) = self.sources[**id] {
+                ancestor_srcs.push(src);
+            }
+        }
+
         ancestor_srcs
     }
 
@@ -145,21 +150,16 @@ impl DepTree {
         self.dependencies[*source.id].as_ref().map(Vec::as_slice)
     }
 
-    fn ancestors_internal<'a>(&'a self, source: &Source,
-                              ancestor_srcs: &mut Vec<&'a Source>,
-                              visited: &mut HashSet<SourceId>) {
-        // cyclic dependency detected
-        if visited.contains(&source.id) {
-            return;
-        }
-
-        visited.insert(source.id);
-        if let Some(ref parents) = self.parents[*source.id] {
-            for p_id in parents {
-                if let Some(ref p) = self.sources[**p_id] {
-                    ancestor_srcs.push(p);
-                    self.ancestors_internal(p, ancestor_srcs, visited);
+    fn ancestors_internal<'a>(&'a self, source_id: SourceId,
+                              ancestors: &mut HashSet<SourceId>) {
+        if let Some(ref parent_ids) = self.parents[*source_id] {
+            for id in parent_ids {
+                if ancestors.contains(id) {
+                    continue;
                 }
+
+                ancestors.insert(*id);
+                self.ancestors_internal(*id, ancestors);
             }
         }
     }
