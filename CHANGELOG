@@ -1,3 +1,7 @@
+3.9.0
+-----
+* optimize tags creation for huge depedency tree
+
 3.8.1
 -----
 * Beautify error format
