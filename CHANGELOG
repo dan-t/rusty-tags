@@ -1,3 +1,7 @@
+3.10.0
+------
+* add async support to regex for excuberant ctags
+
 3.9.0
 -----
 * optimize tags creation for huge depedency tree
