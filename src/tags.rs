@@ -83,7 +83,7 @@ pub fn update_tags(config: &Config, dep_tree: &DepTree) -> RtResult<()> {
         }
     }
 
-    // Creates the cachable tags of each source in 'sources_to_update'. The cachable
+    // Creates the cacheable tags of each source in 'sources_to_update'. The cacheable
     // tags contain the tags of the source and the tags of the public exported dependencies.
     // Furthermore creates the final tags of each source in 'sources_to_update'. The
     // final tags contain the tags of the source and of all direct dependencies.
