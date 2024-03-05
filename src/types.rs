@@ -4,8 +4,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use std::process::Command;
-use std::ops::{Drop, Deref};
-use std::fmt;
+use std::ops::Deref;
 use std::cmp;
 use std::mem;
 
@@ -296,21 +295,21 @@ pub struct Source {
 }
 
 impl Source {
-    pub fn new(id: SourceId, source_version: &SourceVersion, dir: &Path, is_root: bool, config: &Config) -> RtResult<Source> {
+    pub fn new(id: SourceId, name: &str, version: &Version, dir: &Path, is_root: bool, config: &Config) -> RtResult<Source> {
         let tags_dir = find_dir_upwards_containing("Cargo.toml", dir).unwrap_or(dir.to_path_buf());
         let tags_file = tags_dir.join(config.tags_spec.file_name());
         let hash = source_hash(dir);
         let cached_tags_file = {
             let cache_dir = rusty_tags_cache_dir()?;
-            let file_name = format!("{}-{}.{}", source_version.name, hash, config.tags_spec.file_extension());
+            let file_name = format!("{}-{}.{}", name, hash, config.tags_spec.file_extension());
             cache_dir.join(&file_name)
         };
 
         Ok(Source {
             id: id,
             max_depth: None,
-            name: source_version.name.to_owned(),
-            version: source_version.version.clone(),
+            name: name.to_owned(),
+            version: version.clone(),
             dir: dir.to_owned(),
             hash: hash,
             is_root: is_root,
@@ -397,53 +396,6 @@ impl Deref for SourceId {
 
     fn deref(&self) -> &Self::Target {
         &self.id
-    }
-}
-
-/// A temporary struct used for the reading of the result of 'cargo metadata'.
-#[derive(PartialEq, Eq, Clone, PartialOrd, Ord, Hash)]
-pub struct SourceVersion<'a> {
-    /// the 'Cargo.toml' name of the source
-    pub name: &'a str,
-
-    /// the 'Cargo.toml' version of the source
-    pub version: Version
-}
-
-impl<'a> SourceVersion<'a> {
-    pub fn new(name: &'a str, version: Version) -> SourceVersion<'a> {
-        SourceVersion { name, version }
-    }
-
-    /// Parses an id from 'cargo metadata' (e.g "dtoa 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)")
-    /// into a 'SourceVersion'.
-    pub fn parse_from_id(id: &'a str) -> RtResult<SourceVersion<'a>> {
-        let mut split = id.split(' ');
-        let name = split.next();
-        if name == None {
-            return Err(format!("Couldn't extract name from id: '{}'", id).into());
-        }
-        let name = name.unwrap();
-
-        let version = split.next();
-        if version == None {
-            return Err(format!("Couldn't extract version from id: '{}'", id).into());
-        }
-        let version = version.unwrap();
-
-        Ok(SourceVersion::new(name, Version::parse(version)?))
-    }
-}
-
-impl<'a> fmt::Debug for SourceVersion<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "({}, {})", self.name, self.version)
-    }
-}
-
-impl<'a> fmt::Display for SourceVersion<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "({}, {})", self.name, self.version)
     }
 }
 

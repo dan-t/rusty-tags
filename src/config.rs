@@ -5,8 +5,6 @@ use std::io::Read;
 use std::cmp::max;
 use std::process::Command;
 use clap::App;
-use toml;
-use num_cpus;
 use types::{TagsExe, TagsKind, TagsSpec};
 use rt_result::RtResult;
 use dirs;

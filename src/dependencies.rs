@@ -1,10 +1,10 @@
 use std::path::Path;
 
-use serde_json;
+use semver::Version;
 use fnv::FnvHashMap;
 
 use rt_result::RtResult;
-use types::{DepTree, Source, SourceVersion, SourceId};
+use types::{DepTree, Source, SourceId};
 use config::Config;
 
 type JsonValue = serde_json::Value;
@@ -21,25 +21,29 @@ pub fn dependency_tree(config: &Config, metadata: &JsonValue) -> RtResult<DepTre
     Ok(dep_tree)
 }
 
-fn workspace_members(metadata: &JsonValue) -> RtResult<Vec<SourceVersion>> {
+fn workspace_members<'a>(metadata: &'a JsonValue) -> RtResult<Vec<PackageId<'a>>> {
     let members = as_array_from_value("workspace_members", metadata)?;
-    let mut source_versions = Vec::with_capacity(members.len());
+    let mut member_ids = Vec::with_capacity(members.len());
     for member in members {
-        let member_str = member.as_str()
+        let member_id = member.as_str()
             .ok_or(format!("Expected 'workspace_members' of type string but found: {}", to_string_pretty(member)))?;
 
-        source_versions.push(SourceVersion::parse_from_id(member_str)?)
+        member_ids.push(member_id);
     }
 
-    Ok(source_versions)
+    Ok(member_ids)
 }
 
+type PackageId<'a> = &'a str;
+
 struct Package<'a> {
+    pub name: &'a str,
+    pub version: Version,
     pub source_id: SourceId,
     pub source_path: &'a Path
 }
 
-type Packages<'a> = FnvHashMap<SourceVersion<'a>, Package<'a>>;
+type Packages<'a> = FnvHashMap<PackageId<'a>, Package<'a>>;
 
 fn packages<'a>(config: &Config,
                 metadata: &'a JsonValue,
@@ -50,8 +54,8 @@ fn packages<'a>(config: &Config,
     let mut package_map = FnvHashMap::default();
     for package in packages {
         let id = as_str_from_value("id", package)?;
-        let source_version = SourceVersion::parse_from_id(id)?;
-
+        let name = as_str_from_value("name", package)?;
+        let version = Version::parse(as_str_from_value("version", package)?)?;
         let source_path = {
             let path = source_path(config, package)?;
             if path == None {
@@ -61,10 +65,10 @@ fn packages<'a>(config: &Config,
             path.unwrap()
         };
 
-        verbose!(config, "Found package of {} with source at '{}'", source_version, source_path.display());
+        verbose!(config, "Found package of {} {} with source at '{}'", name, version, source_path.display());
 
         let source_id = dep_tree.new_source();
-        package_map.insert(source_version, Package { source_id, source_path });
+        package_map.insert(id, Package { name, version, source_id, source_path });
     }
 
     Ok(package_map)
@@ -76,22 +80,22 @@ fn build_dep_tree(config: &Config,
                   dep_tree: &mut DepTree)
                   -> RtResult<()> {
     let root_ids = {
-        let workspace_members = workspace_members(metadata)?;
-        verbose!(config, "Found workspace members: {:?}", workspace_members);
+        let members_ids = workspace_members(metadata)?;
+        verbose!(config, "Found workspace members: {:?}", members_ids);
 
-        let mut ids = Vec::with_capacity(workspace_members.len());
-        for member in &workspace_members {
-            let member_package = package(member, packages)?;
-            ids.push(member_package.source_id);
+        let mut source_ids = Vec::with_capacity(members_ids.len());
+        for member_id in &members_ids {
+            let member_package = package(&member_id, packages)?;
+            source_ids.push(member_package.source_id);
             if config.omit_deps {
                 let is_root = true;
-                let source = Source::new(member_package.source_id, member,
+                let source = Source::new(member_package.source_id, member_package.name, &member_package.version,
                                          member_package.source_path, is_root, config)?;
                 dep_tree.set_source(source, vec![]);
             }
         }
 
-        ids
+        source_ids
     };
 
     dep_tree.set_roots(root_ids.clone());
@@ -105,53 +109,49 @@ fn build_dep_tree(config: &Config,
     };
 
     for node in nodes {
-        let node_version = {
-            let id = as_str_from_value("id", node)?;
-            SourceVersion::parse_from_id(id)?
-        };
+        let node_id = as_str_from_value("id", node)?;
+        let node_package = package(&node_id, packages)?;
 
-        let node_package = package(&node_version, packages)?;
-
-        let dep_ids = {
+        let dep_src_ids = {
             let dependencies = as_array_from_value("dependencies", node)?;
-
-            let dep_versions = {
-                let mut vers = Vec::with_capacity(dependencies.len());
+            let dep_pkg_ids = {
+                let mut pkg_ids = Vec::with_capacity(dependencies.len());
                 for dep in dependencies {
-                    let id = dep.as_str()
+                    let pkg_id = dep.as_str()
                         .ok_or(format!("Couldn't find string in dependency:\n{}", to_string_pretty(dep)))?;
 
-                    vers.push(SourceVersion::parse_from_id(id)?);
+                    pkg_ids.push(pkg_id);
                 }
 
-                vers
+                pkg_ids
             };
 
-            if ! dep_versions.is_empty() {
-                verbose!(config, "Found dependencies of {}: {:?}", node_version, dep_versions);
+            if ! dep_pkg_ids.is_empty() {
+                verbose!(config, "Found dependencies of {} {}: {:?}", node_package.name, node_package.version, dep_pkg_ids);
             }
 
-            let mut ids = Vec::with_capacity(dep_versions.len());
-            for version in &dep_versions {
-                ids.push(package(version, packages)?.source_id);
+            let mut src_ids = Vec::with_capacity(dep_pkg_ids.len());
+            for pkg_id in &dep_pkg_ids {
+                src_ids.push(package(&pkg_id, packages)?.source_id);
             }
 
-            ids
+            src_ids
         };
 
-        verbose!(config, "Building tree for {}", node_version);
+        verbose!(config, "Building tree for {} {}", node_package.name, node_package.version);
 
         let is_root = root_ids.iter().find(|id| **id == node_package.source_id) != None;
-        let source = Source::new(node_package.source_id, &node_version, node_package.source_path, is_root, config)?;
-        dep_tree.set_source(source, dep_ids);
+        let source = Source::new(node_package.source_id, node_package.name, &node_package.version,
+                                 node_package.source_path, is_root, config)?;
+        dep_tree.set_source(source, dep_src_ids);
     }
 
     Ok(())
 }
 
-fn package<'a>(source_version: &SourceVersion<'a>, packages: &'a Packages) -> RtResult<&'a Package<'a>> {
-    packages.get(&source_version)
-        .ok_or(format!("Couldn't find package for {}", source_version).into())
+fn package<'a>(package_id: &PackageId<'a>, packages: &'a Packages) -> RtResult<&'a Package<'a>> {
+    packages.get(package_id)
+        .ok_or(format!("Couldn't find package for id '{}'", package_id).into())
 }
 
 fn source_path<'a>(config: &Config, package: &'a JsonValue) -> RtResult<Option<&'a Path>> {

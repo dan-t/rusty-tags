@@ -1,6 +1,5 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use extern_dirs;
 
 use rt_result::RtResult;
 
