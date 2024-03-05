@@ -129,7 +129,7 @@ MacOS Issues
 ============
 
 Mac OS users may encounter problems with the execution of `ctags` because the shipped version
-of this program does not support the recursive flag. See [this posting](<http://gmarik.info/blog/2010/10/08/ctags-on-OSX>)
+of this program does not support the recursive flag. See [this posting](<https://www.gmarik.info/blog/2010/ctags-on-osx/>)
 for how to install a working version with homebrew.
 
 Cygwin/Msys Issues
