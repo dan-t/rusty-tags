@@ -1,3 +1,7 @@
+3.11.0
+------
+* Support format change of ids in the subcomand metadata of cargo 1.78
+
 3.10.0
 ------
 * add async support to regex for excuberant ctags
