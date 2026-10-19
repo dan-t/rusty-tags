@@ -56,14 +56,7 @@ fn packages<'a>(config: &Config,
         let id = as_str_from_value("id", package)?;
         let name = as_str_from_value("name", package)?;
         let version = Version::parse(as_str_from_value("version", package)?)?;
-        let source_path = {
-            let path = source_path(config, package)?;
-            if path == None {
-                continue;
-            }
-
-            path.unwrap()
-        };
+        let source_path = source_path(config, package)?;
 
         verbose!(config, "Found package of {} {} with source at '{}'", name, version, source_path.display());
 
@@ -154,7 +147,7 @@ fn package<'a>(package_id: &PackageId<'a>, packages: &'a Packages) -> RtResult<&
         .ok_or(format!("Couldn't find package for id '{}'", package_id).into())
 }
 
-fn source_path<'a>(config: &Config, package: &'a JsonValue) -> RtResult<Option<&'a Path>> {
+fn source_path<'a>(config: &Config, package: &'a JsonValue) -> RtResult<&'a Path> {
     let targets = as_array_from_value("targets", package)?;
 
     let manifest_dir = {
@@ -192,11 +185,13 @@ fn source_path<'a>(config: &Config, package: &'a JsonValue) -> RtResult<Option<&
                                    src_path.display(), to_string_pretty(target), to_string_pretty(package)).into());
             }
 
-            return Ok(Some(src_path));
+            return Ok(src_path);
         }
     }
 
-    Ok(None)
+    // Fall back to the manifest dir for unsupported target kinds (e.g. bench-only
+    // crates); skipping such packages breaks the dep tree lookup.
+    Ok(manifest_dir)
 }
 
 fn to_string_pretty(value: &JsonValue) -> String {
